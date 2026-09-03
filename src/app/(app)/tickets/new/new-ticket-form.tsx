@@ -21,7 +21,7 @@ const CATEGORIES = [
 const PRIORITIES = ["LOW", "MEDIUM", "HIGH", "URGENT"] as const;
 
 const fieldClass =
-  "w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50";
+  "w-full rounded-lg border border-input bg-background text-foreground dark:bg-zinc-900 dark:text-zinc-100 px-3 py-2 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50";
 
 function SubmitButton() {
   const { pending } = useFormStatus();

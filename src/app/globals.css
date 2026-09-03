@@ -50,6 +50,7 @@
 
 /* HalkTV markası — birincil renk kırmızı (~#ED1C24). */
 :root {
+  color-scheme: light;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
@@ -85,6 +86,7 @@
 }
 
 .dark {
+  color-scheme: dark;
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.205 0 0);
@@ -127,6 +129,13 @@
   }
   html {
     @apply font-sans;
+  }
+  select {
+    @apply bg-background text-foreground border-border;
+  }
+  select option {
+    background-color: var(--card);
+    color: var(--card-foreground);
   }
   ::selection {
     background-color: var(--primary);

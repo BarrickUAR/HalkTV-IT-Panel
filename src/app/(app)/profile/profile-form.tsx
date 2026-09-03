@@ -105,12 +105,20 @@ export function ProfileForm({
                 id="pf-departmentId"
                 name="departmentId"
                 defaultValue={user.departmentId ?? ""}
-                className="w-full rounded-lg border border-input bg-transparent px-3 h-10 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                className="w-full rounded-lg border border-input bg-background text-foreground dark:bg-zinc-900 dark:text-zinc-100 px-3 h-10 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 shadow-xs"
                 required
               >
-                <option value="" disabled>Lütfen seçin...</option>
+                <option value="" disabled className="bg-background text-muted-foreground dark:bg-zinc-900 dark:text-zinc-400">
+                  Lütfen seçin...
+                </option>
                 {departments.map((d: any) => (
-                  <option key={d.id} value={d.id}>{d.name}</option>
+                  <option
+                    key={d.id}
+                    value={d.id}
+                    className="bg-background text-foreground dark:bg-zinc-900 dark:text-zinc-100 py-1"
+                  >
+                    {d.name}
+                  </option>
                 ))}
               </select>
             </div>
@@ -130,11 +138,21 @@ export function ProfileForm({
                       name="computerId"
                       defaultValue={assignedComputer?.id ?? ""}
                       disabled={hasComputer}
-                      className={`w-full rounded-lg border border-input bg-transparent px-3 h-10 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 ${hasComputer ? "bg-muted cursor-not-allowed opacity-70" : ""}`}
+                      className={`w-full rounded-lg border border-input bg-background text-foreground dark:bg-zinc-900 dark:text-zinc-100 px-3 h-10 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 shadow-xs ${
+                        hasComputer ? "bg-muted cursor-not-allowed opacity-70" : ""
+                      }`}
                     >
-                      <option value="">(Yok)</option>
+                      <option value="" className="bg-background text-foreground dark:bg-zinc-900 dark:text-zinc-100">
+                        (Yok)
+                      </option>
                       {computers.map((c: any) => (
-                        <option key={c.id} value={c.id}>{c.name}</option>
+                        <option
+                          key={c.id}
+                          value={c.id}
+                          className="bg-background text-foreground dark:bg-zinc-900 dark:text-zinc-100 py-1"
+                        >
+                          {c.name}
+                        </option>
                       ))}
                     </select>
                     {hasComputer && <p className="text-[10px] text-muted-foreground">Cihaz atanmış, değiştirilemez.</p>}
