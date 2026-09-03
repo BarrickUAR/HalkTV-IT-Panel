@@ -83,7 +83,7 @@ export async function POST(req: Request) {
 
   const itStaff = await prisma.user.findMany({
     where: {
-      role: { in: ["IT_AGENT", "IT_LEAD", "IT_MANAGER", "SUPER_ADMIN"] },
+      role: { in: ["IT_AGENT", "TEKNIK_YONETMEN", "TEKNIK_MUDUR", "SUPER_ADMIN"] },
       status: "ACTIVE",
     },
     select: { id: true },

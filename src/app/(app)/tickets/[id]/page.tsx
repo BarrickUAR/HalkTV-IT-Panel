@@ -8,6 +8,7 @@ import { requireUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { isITStaff } from "@/lib/rbac/permissions";
 import { cn } from "@/lib/utils";
+import { TicketHistory } from "./ticket-history";
 import {
   CATEGORY_LABELS,
   PRIORITY_BADGE,
@@ -77,13 +78,14 @@ export default async function TicketDetailPage({
         orderBy: { createdAt: "desc" },
         include: { user: { select: { name: true, email: true } } },
       },
+      attachments: true,
     },
   });
 
   const agents = it
     ? await prisma.user.findMany({
         where: {
-          role: { in: ["IT_AGENT", "IT_LEAD", "IT_MANAGER", "SUPER_ADMIN"] },
+          role: { in: ["IT_AGENT", "TEKNIK_YONETMEN", "TEKNIK_MUDUR", "SUPER_ADMIN"] },
           status: "ACTIVE",
         },
         select: { id: true, name: true, email: true },
@@ -94,6 +96,11 @@ export default async function TicketDetailPage({
   if (!ticket || (!it && ticket.requesterId !== user.id)) notFound();
 
   const comments = await fetchComments(id);
+  const logs = await prisma.auditLog.findMany({
+    where: { entityType: "Ticket", entityId: id },
+    orderBy: { createdAt: "desc" },
+    include: { actor: { select: { name: true } } },
+  });
 
   const totalMinutes = ticket.timeEntries.reduce((s: number, e: any) => s + e.minutes, 0);
   const canRate =
@@ -128,6 +135,35 @@ export default async function TicketDetailPage({
             <p className="text-sm leading-relaxed whitespace-pre-wrap">
               {ticket.description}
             </p>
+
+            {ticket.attachments.length > 0 && (
+              <div className="mt-6 border-t pt-4">
+                <h4 className="text-xs font-semibold text-muted-foreground mb-3">Ekler</h4>
+                <div className="flex flex-wrap gap-3">
+                  {ticket.attachments.map((a: any) => (
+                    <a
+                      key={a.id}
+                      href={a.storagePath}
+                      download={a.fileName}
+                      className="group flex max-w-[200px] items-center gap-3 rounded-lg border bg-muted/40 p-2 text-xs transition-colors hover:border-primary/50 hover:bg-muted/80"
+                    >
+                      <div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-background shadow-sm group-hover:text-primary">
+                        {a.mimeType.startsWith("image/") ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={a.storagePath} alt={a.fileName} className="size-full rounded-md object-cover" />
+                        ) : (
+                          <span className="font-semibold uppercase">{a.fileName.split('.').pop()}</span>
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-medium">{a.fileName}</p>
+                        <p className="text-[10px] text-muted-foreground">{Math.round(a.sizeBytes / 1024)} KB</p>
+                      </div>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           <CommentThread
@@ -236,6 +272,9 @@ export default async function TicketDetailPage({
               ) : null}
             </div>
           ) : null}
+
+          {/* İşlem Geçmişi (Loglar) */}
+          <TicketHistory logs={logs} />
 
           {ticket.survey ? (
             <div className="rounded-xl border bg-card p-5">

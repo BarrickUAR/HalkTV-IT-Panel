@@ -109,11 +109,11 @@ export function NewTicketForm({
         >
           <option value="" disabled>Lütfen bulunduğunuz yeri seçin</option>
           {deptList.map((d) => (
-            <option key={d.id} value={d.name}>
+            <option key={d.id} value={d.id}>
               {d.name}
             </option>
           ))}
-          <option value="Diğer (Açıklamada belirtin)">Diğer (Açıklamada belirtin)</option>
+          <option value="other">Diğer (Açıklamada belirtin)</option>
         </select>
       </div>
 

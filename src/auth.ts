@@ -26,17 +26,33 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         password: { label: "Şifre", type: "password" },
       },
       async authorize(creds) {
-        const username = String(creds?.username ?? "")
+        const input = String(creds?.username ?? "")
           .trim()
           .toLowerCase();
         const password = String(creds?.password ?? "");
-        if (!username || !password) return null;
+        if (!input || !password) return null;
 
-        const user = await prisma.user.findUnique({ where: { username } });
+        if (input.includes("@") && !input.endsWith("@halktv.com.tr")) {
+          throw new Error("Sadece @halktv.com.tr uzantılı e-posta adresleri ile giriş yapılabilir.");
+        }
+
+        const user = await prisma.user.findFirst({
+          where: {
+            OR: [
+              { username: input },
+              { email: input }
+            ]
+          }
+        });
         if (!user?.passwordHash || user.status !== "ACTIVE") return null;
 
         const ok = await bcrypt.compare(password, user.passwordHash);
         if (!ok) return null;
+
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { lastLoginAt: new Date() },
+        });
 
         return {
           id: user.id,
@@ -50,6 +66,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
   callbacks: {
+    async signIn({ user, account, profile }) {
+      if (account?.provider !== "credentials") {
+        if (!user.email?.endsWith("@halktv.com.tr")) {
+          return false;
+        }
+      }
+      return true;
+    },
     jwt({ token, user }) {
       if (user) {
         token.role = user.role;

@@ -4,7 +4,7 @@ import { format } from "date-fns";
 import { tr } from "date-fns/locale";
 
 export default async function AuditLogPage() {
-  const user = await requireRole(["IT_AGENT", "IT_LEAD", "IT_MANAGER", "SUPER_ADMIN"]);
+  const user = await requireRole(["IT_AGENT", "TEKNIK_YONETMEN", "TEKNIK_MUDUR", "SUPER_ADMIN"]);
 
   const logs = await prisma.auditLog.findMany({
     orderBy: { createdAt: "desc" },

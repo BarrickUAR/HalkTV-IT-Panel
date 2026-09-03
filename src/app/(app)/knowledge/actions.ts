@@ -16,7 +16,7 @@ const schema = z.object({
 
 export async function createArticleAction(_prev: any, formData: FormData) {
   // Sadece IT personeli makale ekleyebilir
-  const user = await requireRole(["IT_AGENT", "IT_LEAD", "IT_MANAGER", "SUPER_ADMIN"]);
+  const user = await requireRole(["IT_AGENT", "TEKNIK_YONETMEN", "TEKNIK_MUDUR", "SUPER_ADMIN"]);
 
   const parsed = schema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) {

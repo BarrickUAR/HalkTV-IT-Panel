@@ -5,9 +5,10 @@ import { useFormStatus } from "react-dom";
 import { toast } from "sonner";
 import type { Role } from "@prisma/client";
 
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
 import { ROLE_LABELS } from "@/lib/rbac/roles";
 
 import { createUserAction } from "./actions";
@@ -30,7 +31,7 @@ export function CreateUserForm({ roles, departments }: { roles: Role[]; departme
 
   useEffect(() => {
     if (state?.ok) {
-      toast.success("Kullanıcı eklendi.");
+      toast.success("Yeni kullanıcı sisteme başarıyla eklendi.");
       formRef.current?.reset();
     }
   }, [state]);
@@ -56,7 +57,7 @@ export function CreateUserForm({ roles, departments }: { roles: Role[]; departme
         </div>
         <div className="space-y-2">
           <Label htmlFor="cu-password">Şifre</Label>
-          <Input id="cu-password" name="password" type="password" required placeholder="En az 8 karakter" className="h-10" minLength={8} />
+          <PasswordInput id="cu-password" name="password" required placeholder="En az 8 karakter" className="h-10" minLength={8} />
         </div>
         <div className="space-y-2">
           <Label htmlFor="cu-role">Rol</Label>

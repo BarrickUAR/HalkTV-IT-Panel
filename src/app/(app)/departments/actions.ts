@@ -10,7 +10,7 @@ const deptSchema = z.object({
 });
 
 export async function createDepartmentAction(_prev: any, formData: FormData) {
-  await requireRole(["IT_AGENT", "IT_LEAD", "IT_MANAGER", "SUPER_ADMIN"]);
+  await requireRole(["IT_AGENT", "TEKNIK_YONETMEN", "TEKNIK_MUDUR", "SUPER_ADMIN"]);
 
   const parsed = deptSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) {
@@ -35,11 +35,34 @@ export async function createDepartmentAction(_prev: any, formData: FormData) {
   return { ok: true };
 }
 
-export async function deleteDepartmentAction(id: string) {
-  await requireRole(["IT_MANAGER", "SUPER_ADMIN"]);
+export async function deleteDepartmentAction(id: string): Promise<{ok?: boolean; error?: string}> {
+  await requireRole(["TEKNIK_MUDUR", "SUPER_ADMIN"]);
 
   await prisma.department.delete({
     where: { id },
+  });
+
+  revalidatePath("/departments");
+  revalidatePath("/inventory");
+  revalidatePath("/users");
+  revalidatePath("/tickets/new");
+  return { ok: true };
+}
+
+export async function updateDepartmentAction(id: string, newName: string) {
+  await requireRole(["TEKNIK_YONETMEN", "TEKNIK_MUDUR", "SUPER_ADMIN"]);
+  
+  const name = newName.trim();
+  if (name.length < 2) return { error: "Departman adı en az 2 karakter olmalıdır." };
+
+  const existing = await prisma.department.findUnique({ where: { name } });
+  if (existing && existing.id !== id) {
+    return { error: "Bu departman adı zaten kullanımda." };
+  }
+
+  await prisma.department.update({
+    where: { id },
+    data: { name },
   });
 
   revalidatePath("/departments");

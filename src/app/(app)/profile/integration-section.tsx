@@ -83,8 +83,8 @@ function HookRow({ hook }: { hook: Hook }) {
           onClick={() =>
             start(async () => {
               const r = await testWebhook(hook.id);
-              if (r.ok) toast.success("Test mesajı gönderildi.");
-              else toast.error("Gönderilemedi (URL'i kontrol et).");
+              if (r.ok) toast.success("Test mesajı başarıyla gönderildi.");
+              else toast.error("Gönderilemedi, lütfen Webhook URL'sini kontrol edin.");
             })
           }
         >
@@ -98,6 +98,7 @@ function HookRow({ hook }: { hook: Hook }) {
           onClick={() =>
             start(async () => {
               await toggleWebhook(hook.id, !hook.isActive);
+              toast.success(hook.isActive ? "Webhook duraklatıldı." : "Webhook aktifleştirildi.");
               router.refresh();
             })
           }
@@ -112,7 +113,7 @@ function HookRow({ hook }: { hook: Hook }) {
           onClick={() =>
             start(async () => {
               await deleteWebhook(hook.id);
-              toast.success("Silindi.");
+              toast.success("Webhook entegrasyonu başarıyla silindi.");
               router.refresh();
             })
           }
@@ -131,7 +132,7 @@ export function IntegrationSection({ webhooks }: { webhooks: Hook[] }) {
 
   useEffect(() => {
     if (state?.ok) {
-      toast.success("Webhook eklendi.");
+      toast.success("Yeni Webhook entegrasyonu başarıyla eklendi.");
       ref.current?.reset();
       setSelected([]);
     }

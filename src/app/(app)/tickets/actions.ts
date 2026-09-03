@@ -7,7 +7,7 @@ import { z } from "zod";
 import { requireUser } from "@/lib/auth-helpers";
 import { notifyMany } from "@/lib/notify";
 import { prisma } from "@/lib/prisma";
-import { uploadFileToSupabase } from "@/lib/supabase";
+import { saveUpload } from "@/lib/upload";
 import { nextTicketNumber } from "@/lib/tickets";
 
 const schema = z.object({
@@ -55,10 +55,14 @@ export async function createTicket(
     MEDIUM: 24,
     LOW: 72,
   };
+  
+  const { location, ...ticketData } = parsed.data;
+  
   const ticket = await prisma.ticket.create({
     data: {
       number,
-      ...parsed.data,
+      ...ticketData,
+      departmentId: location === "other" ? null : location,
       requesterId: user.id,
       slaDueAt: new Date(
         Date.now() + (SLA_HOURS[parsed.data.priority] ?? 24) * 3_600_000,
@@ -68,16 +72,16 @@ export async function createTicket(
 
   const attachment = formData.get("attachment") as File | null;
   if (attachment && attachment.size > 0) {
-    const path = await uploadFileToSupabase(attachment);
-    if (path) {
+    const res = await saveUpload(attachment, "tickets");
+    if (res.ok) {
       await prisma.attachment.create({
         data: {
           ticketId: ticket.id,
           uploaderId: user.id,
-          fileName: attachment.name,
-          mimeType: attachment.type,
-          sizeBytes: attachment.size,
-          storagePath: path,
+          fileName: res.fileName,
+          mimeType: res.mimeType,
+          sizeBytes: res.sizeBytes,
+          storagePath: res.url, // URL as storage path for easy access
         }
       });
     }
@@ -86,7 +90,7 @@ export async function createTicket(
   // IT ekibine yeni talep bildir
   const itStaff = await prisma.user.findMany({
     where: {
-      role: { in: ["IT_AGENT", "IT_LEAD", "IT_MANAGER", "SUPER_ADMIN"] },
+      role: { in: ["IT_AGENT", "TEKNIK_YONETMEN", "TEKNIK_MUDUR", "SUPER_ADMIN"] },
       status: "ACTIVE",
       id: { not: user.id },
     },

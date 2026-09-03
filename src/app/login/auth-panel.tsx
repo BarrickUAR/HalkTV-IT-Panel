@@ -5,6 +5,7 @@ import { useFormStatus } from "react-dom";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 
@@ -41,10 +42,9 @@ function CredentialsForm() {
       </div>
       <div className="space-y-2">
         <Label htmlFor="login-password">Şifre</Label>
-        <Input
+        <PasswordInput
           id="login-password"
           name="password"
-          type="password"
           required
           placeholder="••••••••"
           className="h-11"

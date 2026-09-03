@@ -14,7 +14,7 @@ export default async function EditUserPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const actor = await requireRole(["IT_MANAGER", "SUPER_ADMIN"]);
+  const actor = await requireRole(["TEKNIK_YONETMEN", "TEKNIK_MUDUR", "SUPER_ADMIN"]);
   const user = await prisma.user.findUnique({
     where: { id },
     select: {
@@ -33,7 +33,10 @@ export default async function EditUserPage({
     },
   });
   if (!user) notFound();
-
+  
+  const departments = await prisma.department.findMany({
+    orderBy: { name: "asc" },
+  });
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -55,7 +58,7 @@ export default async function EditUserPage({
 
       <section className="rounded-xl border bg-card p-6">
         <h2 className="mb-4 font-semibold">Bilgiler</h2>
-        <EditUserForm user={user} roles={assignableRoles(actor.role)} />
+        <EditUserForm user={user} roles={assignableRoles(actor.role)} departments={departments} />
       </section>
 
       <section className="rounded-xl border bg-card p-6">

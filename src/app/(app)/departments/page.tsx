@@ -3,8 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { isITStaff } from "@/lib/rbac/permissions";
 import { redirect } from "next/navigation";
 import { DepartmentForm } from "./department-form";
-import { Button } from "@/components/ui/button";
-import { deleteDepartmentAction } from "./actions";
+import { DepartmentRow } from "./department-row";
 
 export default async function DepartmentsPage() {
   const user = await requireUser();
@@ -53,28 +52,7 @@ export default async function DepartmentsPage() {
               </tr>
             ) : (
               departments.map((d) => (
-                <tr key={d.id} className="hover:bg-muted/30 transition-colors">
-                  <td className="px-4 py-3 font-medium text-foreground">{d.name}</td>
-                  <td className="px-4 py-3 text-center text-muted-foreground">{d._count.users}</td>
-                  <td className="px-4 py-3 text-center text-muted-foreground">{d._count.computers}</td>
-                  <td className="px-4 py-3 text-right">
-                    <form
-                      action={async () => {
-                        "use server";
-                        await deleteDepartmentAction(d.id);
-                      }}
-                    >
-                      <Button
-                        type="submit"
-                        variant="ghost"
-                        size="sm"
-                        className="text-destructive hover:text-destructive hover:bg-destructive/10 h-8 px-2"
-                      >
-                        Sil
-                      </Button>
-                    </form>
-                  </td>
-                </tr>
+                <DepartmentRow key={d.id} department={d} />
               ))
             )}
           </tbody>

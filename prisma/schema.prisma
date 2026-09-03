@@ -16,8 +16,8 @@ generator client {
 // ============================================================
 enum Role {
   SUPER_ADMIN
-  IT_MANAGER
-  IT_LEAD
+  TEKNIK_MUDUR
+  TEKNIK_YONETMEN
   IT_AGENT
   EMPLOYEE
 }
@@ -175,9 +175,12 @@ model User {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  lastLoginAt DateTime?
+  lastActiveAt DateTime?
 
   @@index([role])
   @@index([status])
+  @@index([departmentId])
 }
 
 // ============================================================
@@ -384,7 +387,13 @@ model DirectMessage {
   body        String    @db.Text
   isRead      Boolean   @default(false)
   readAt      DateTime?
-  createdAt   DateTime  @default(now())
+
+  // Dosya eklentisi (opsiyonel)
+  attachmentUrl  String?
+  attachmentName String?
+  attachmentType String? // "image" | "file"
+
+  createdAt DateTime @default(now())
 
   @@index([senderId, recipientId])
   @@index([recipientId, isRead])

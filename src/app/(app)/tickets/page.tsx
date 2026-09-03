@@ -44,7 +44,7 @@ type TicketRow = {
   priority: TicketPriority;
   status: TicketStatus;
   createdAt: Date;
-  requester: { name: string | null; email: string | null };
+  requester: { name: string | null; email: string | null; title: string | null; department: { name: string } | null };
   assignee: { name: string | null } | null;
   slaDueAt: Date | null;
 };
@@ -99,14 +99,14 @@ export default async function TicketsPage({
       orderBy: { createdAt: "desc" },
       take: 100,
       include: {
-        requester: { select: { name: true, email: true } },
+        requester: { select: { name: true, email: true, title: true, department: { select: { name: true } } } },
         assignee: { select: { name: true } },
       },
     }),
     it
       ? prisma.user.findMany({
           where: {
-            role: { in: ["IT_AGENT", "IT_LEAD", "IT_MANAGER", "SUPER_ADMIN"] },
+            role: { in: ["IT_AGENT", "TEKNIK_YONETMEN", "TEKNIK_MUDUR", "SUPER_ADMIN"] },
             status: "ACTIVE",
           },
           select: { id: true, name: true, email: true },
@@ -212,24 +212,30 @@ export default async function TicketsPage({
 
       {/* Tablo */}
       {tickets.length === 0 ? (
-        <div className="rounded-xl border bg-card p-12 text-center text-sm text-muted-foreground">
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed bg-card p-16 text-center shadow-sm">
+          <div className="mb-4 flex size-16 items-center justify-center rounded-full bg-primary/10">
+            <HiOutlineMagnifyingGlass className="size-8 text-primary/60" />
+          </div>
+          <h3 className="mb-1 text-lg font-semibold text-foreground">Talep Bulunamadı</h3>
+          <p className="mb-6 max-w-sm text-sm text-muted-foreground">
+            {hasFilter
+              ? "Seçtiğiniz filtrelere uygun bir talep bulunmuyor. Farklı filtreler deneyebilir veya mevcut aramayı temizleyebilirsiniz."
+              : "Henüz oluşturulmuş bir talep yok. Teknik destek veya donanım ihtiyaçlarınız için hemen yeni bir talep açabilirsiniz."}
+          </p>
           {hasFilter ? (
-            <>
-              Bu filtreyle talep yok.{" "}
-              <Link href="/tickets" className="text-primary hover:underline">
-                Filtreyi temizle.
-              </Link>
-            </>
+            <Link
+              href="/tickets"
+              className={cn(buttonVariants({ variant: "outline" }), "font-semibold")}
+            >
+              Filtreyi Temizle
+            </Link>
           ) : (
-            <>
-              Henüz talep yok.{" "}
-              <Link
-                href="/tickets/new"
-                className="text-primary hover:underline"
-              >
-                Yeni talep aç.
-              </Link>
-            </>
+            <Link
+              href="/tickets/new"
+              className={cn(buttonVariants({ variant: "default" }), "font-semibold shadow-sm")}
+            >
+              <HiOutlinePlus className="mr-2 size-4" /> Yeni Talep Aç
+            </Link>
           )}
         </div>
       ) : (
@@ -240,16 +246,11 @@ export default async function TicketsPage({
           <table className="w-full text-sm">
             <thead className="border-b bg-muted/40 text-left text-xs text-muted-foreground">
               <tr>
-                <th className="px-4 py-3 font-medium">No</th>
-                <th className="px-4 py-3 font-medium">Konu</th>
+                {it ? <th className="px-4 py-3 font-medium">Talep Eden</th> : null}
+                <th className="px-4 py-3 font-medium">Talep Konusu</th>
                 <th className="px-4 py-3 font-medium">Öncelik</th>
                 <th className="px-4 py-3 font-medium">Durum</th>
-                {it ? (
-                  <>
-                    <th className="px-4 py-3 font-medium">Talep eden</th>
-                    <th className="px-4 py-3 font-medium">Atanan</th>
-                  </>
-                ) : null}
+                {it ? <th className="px-4 py-3 font-medium">Atanan</th> : null}
                 <th className="px-4 py-3 font-medium">SLA</th>
                 <th className="px-4 py-3 font-medium">Tarih</th>
               </tr>
@@ -265,26 +266,42 @@ export default async function TicketsPage({
                     key={t.id}
                     className="border-t transition-colors hover:bg-muted/30"
                   >
-                    <td className="px-4 py-3 align-top">
-                      <Link
-                        href={`/tickets/${t.id}`}
-                        className="font-mono text-xs text-primary hover:underline"
-                      >
-                        {t.number}
-                      </Link>
+                    {it ? (
+                      <td className="px-4 py-3 align-middle">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                            <span className="text-xs font-bold uppercase">
+                              {t.requester.name?.charAt(0) ?? t.requester.email?.charAt(0) ?? "?"}
+                            </span>
+                          </div>
+                          <div className="flex min-w-0 flex-col">
+                            <span className="truncate text-sm font-semibold">{t.requester.name ?? "İsimsiz"}</span>
+                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
+                              {t.requester.title && <span>{t.requester.title}</span>}
+                              {t.requester.title && t.requester.department?.name && <span className="opacity-50">•</span>}
+                              {t.requester.department?.name && <span>{t.requester.department.name}</span>}
+                              {!t.requester.title && !t.requester.department?.name && <span>{t.requester.email}</span>}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                    ) : null}
+                    <td className="px-4 py-3 align-middle">
+                      <div className="flex flex-col">
+                        <Link
+                          href={`/tickets/${t.id}`}
+                          className="font-semibold text-foreground hover:underline"
+                        >
+                          {t.title}
+                        </Link>
+                        <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+                          <span className="font-mono font-medium text-primary/80">#{t.number}</span>
+                          <span className="opacity-50">•</span>
+                          <span>{CATEGORY_LABELS[t.category]}</span>
+                        </div>
+                      </div>
                     </td>
-                    <td className="px-4 py-3">
-                      <Link
-                        href={`/tickets/${t.id}`}
-                        className="font-medium hover:underline"
-                      >
-                        {t.title}
-                      </Link>
-                      <p className="text-xs text-muted-foreground">
-                        {CATEGORY_LABELS[t.category]}
-                      </p>
-                    </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3 align-middle">
                       <span
                         className={cn(
                           "inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium",
@@ -294,7 +311,7 @@ export default async function TicketsPage({
                         {PRIORITY_LABELS[t.priority]}
                       </span>
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3 align-middle">
                       <span
                         className={cn(
                           "inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium",
@@ -305,20 +322,15 @@ export default async function TicketsPage({
                       </span>
                     </td>
                     {it ? (
-                      <>
-                        <td className="px-4 py-3 text-muted-foreground">
-                          {t.requester.name ?? t.requester.email}
-                        </td>
-                        <td className="px-4 py-3 text-muted-foreground">
-                          {t.assignee?.name ?? (
-                            <span className="text-amber-600 dark:text-amber-400">
-                              Atanmamış
-                            </span>
-                          )}
-                        </td>
-                      </>
+                      <td className="px-4 py-3 align-middle text-muted-foreground">
+                        {t.assignee?.name ?? (
+                          <span className="text-amber-600 dark:text-amber-400 font-medium">
+                            Atanmamış
+                          </span>
+                        )}
+                      </td>
                     ) : null}
-                    <td className="px-4 py-3 whitespace-nowrap">
+                    <td className="px-4 py-3 align-middle whitespace-nowrap">
                       {t.slaDueAt ? (
                         <span
                           className={cn(
@@ -337,7 +349,7 @@ export default async function TicketsPage({
                         <span className="text-xs text-muted-foreground">—</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-muted-foreground text-xs">
+                    <td className="px-4 py-3 align-middle whitespace-nowrap text-muted-foreground text-xs">
                       {format(new Date(t.createdAt), "d MMM yyyy", {
                         locale: tr,
                       })}

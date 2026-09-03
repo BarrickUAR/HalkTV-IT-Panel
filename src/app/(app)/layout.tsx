@@ -4,9 +4,9 @@ import { LiveChat } from "@/components/app-shell/live-chat";
 import { Sidebar } from "@/components/app-shell/sidebar";
 import { SidebarAnnouncements } from "@/components/app-shell/sidebar-announcements";
 import { Topbar } from "@/components/app-shell/topbar";
-import { DepartmentPickerModal } from "@/components/app-shell/department-picker";
+import { EmployeeDock } from "@/components/app-shell/employee-dock";
 import { requireUser } from "@/lib/auth-helpers";
-
+import { isITStaff } from "@/lib/rbac/permissions";
 import { prisma } from "@/lib/prisma";
 
 export default async function AppLayout({
@@ -15,17 +15,27 @@ export default async function AppLayout({
   children: React.ReactNode;
 }) {
   const user = await requireUser();
+  const isStaff = isITStaff(user.role);
 
-  let departments: { id: string; name: string }[] = [];
-  if (!user.department && user.role === "EMPLOYEE") {
-    try {
-      departments = await prisma.department.findMany({
-        select: { id: true, name: true },
-        orderBy: { name: "asc" },
-      });
-    } catch {
-      departments = [];
-    }
+  if (!isStaff) {
+    return (
+      <div className="flex min-h-dvh flex-col bg-zinc-50 dark:bg-zinc-950">
+        <Topbar name={user.name} email={user.email} role={user.role} />
+        
+        {/* Horizontal Premium Dock for Employees */}
+        <EmployeeDock role={user.role} />
+        <AnnouncementBanner />
+
+        {/* Main Content */}
+        <main className="flex-1 p-4 lg:p-6 lg:pl-[120px]">
+          <div className="mx-auto max-w-5xl">
+            {children}
+          </div>
+        </main>
+        
+        <LiveChat />
+      </div>
+    );
   }
 
   return (
@@ -48,10 +58,6 @@ export default async function AppLayout({
 
       <LiveChat />
       
-      {/* Departman seçimi (Sadece departmanı olmayan çalışanlar için onboarding modal) */}
-      {!user.department && user.role === "EMPLOYEE" && (
-        <DepartmentPickerModal departments={departments} />
-      )}
     </div>
   );
 }

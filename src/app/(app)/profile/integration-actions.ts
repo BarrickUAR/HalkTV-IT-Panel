@@ -45,7 +45,7 @@ export async function createWebhook(
       events,
     },
   });
-  revalidatePath("/settings");
+  revalidatePath("/profile");
   return { ok: true };
 }
 
@@ -59,7 +59,7 @@ export async function toggleWebhook(
     where: { id },
     data: { isActive: active },
   });
-  revalidatePath("/settings");
+  revalidatePath("/profile");
   return { ok: true };
 }
 
@@ -67,7 +67,7 @@ export async function deleteWebhook(id: string): Promise<{ ok: boolean }> {
   const u = await guard();
   if (!u) return { ok: false };
   await prisma.integrationWebhook.delete({ where: { id } });
-  revalidatePath("/settings");
+  revalidatePath("/profile");
   return { ok: true };
 }
 

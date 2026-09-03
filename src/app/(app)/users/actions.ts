@@ -13,13 +13,14 @@ export type UserFormState = { ok?: boolean; error?: string } | undefined;
 const ROLE_ENUM = z.enum([
   "EMPLOYEE",
   "IT_AGENT",
-  "IT_MANAGER",
+  "TEKNIK_YONETMEN",
+  "TEKNIK_MUDUR",
   "SUPER_ADMIN",
 ]);
 
 const createSchema = z.object({
   name: z.string().trim().min(2, "Ad Soyad gir.").max(120),
-  email: z.string().trim().toLowerCase().email("Geçerli e-posta gir."),
+  email: z.string().trim().toLowerCase().email("Geçerli e-posta gir.").regex(/@halktv\.com\.tr$/, "Sadece @halktv.com.tr uzantılı e-postalar eklenebilir."),
   username: z
     .string()
     .trim()
@@ -40,7 +41,7 @@ export async function createUserAction(
   _prev: UserFormState,
   formData: FormData,
 ): Promise<UserFormState> {
-  const actor = await requireRole(["IT_MANAGER", "SUPER_ADMIN"]);
+  const actor = await requireRole(["TEKNIK_YONETMEN", "TEKNIK_MUDUR", "SUPER_ADMIN"]);
   const parsed = createSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: parsed.error.issues[0]?.message };
   if (!assignableRoles(actor.role).includes(parsed.data.role)) {
@@ -90,7 +91,7 @@ export async function updateUserAction(
   _prev: UserFormState,
   formData: FormData,
 ): Promise<UserFormState> {
-  const actor = await requireRole(["IT_MANAGER", "SUPER_ADMIN"]);
+  const actor = await requireRole(["TEKNIK_YONETMEN", "TEKNIK_MUDUR", "SUPER_ADMIN"]);
   const parsed = updateSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: parsed.error.issues[0]?.message };
   if (!assignableRoles(actor.role).includes(parsed.data.role)) {
@@ -125,7 +126,7 @@ export async function resetPasswordAction(
   _prev: UserFormState,
   formData: FormData,
 ): Promise<UserFormState> {
-  await requireRole(["IT_MANAGER", "SUPER_ADMIN"]);
+  await requireRole(["TEKNIK_YONETMEN", "TEKNIK_MUDUR", "SUPER_ADMIN"]);
   const id = String(formData.get("id") ?? "");
   const password = String(formData.get("password") ?? "");
   if (password.length < 8) return { error: "Şifre en az 8 karakter olmalı." };

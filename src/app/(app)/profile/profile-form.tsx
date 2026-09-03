@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { UserAvatar } from "@/components/app-shell/user-avatar";
 import { roleLabel } from "@/lib/rbac/roles";
+import { isITStaff } from "@/lib/rbac/permissions";
 import { updateProfileAction } from "./actions";
 import type { Role } from "@prisma/client";
 
@@ -41,6 +42,7 @@ export function ProfileForm({
   computers: any[];
 }) {
   const [state, action] = useActionState(updateProfileAction, undefined);
+  const isStaff = isITStaff(user.role);
 
   useEffect(() => {
     if (state?.ok) {
@@ -54,11 +56,49 @@ export function ProfileForm({
       
       <div className="px-6 pb-8">
         <div className="-mt-12 mb-6 flex items-end gap-4">
-          <UserAvatar 
-            role={user.role} 
-            image={user.image} 
-            className="size-24 border-4 border-card text-4xl shadow-sm" 
-          />
+          <div className="relative group">
+            <UserAvatar 
+              role={user.role} 
+              image={user.image} 
+              className="size-24 border-4 border-card text-4xl shadow-sm transition-opacity group-hover:opacity-70" 
+            />
+            <label 
+              htmlFor="pf-image-upload" 
+              className="absolute inset-0 flex cursor-pointer items-center justify-center rounded-full bg-black/50 opacity-0 transition-opacity group-hover:opacity-100"
+            >
+              <span className="text-xs font-semibold text-white">Değiştir</span>
+            </label>
+            <input 
+              type="file" 
+              id="pf-image-upload" 
+              accept="image/*" 
+              className="hidden" 
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                if (file.size > 2 * 1024 * 1024) {
+                  toast.error("Fotoğraf boyutu 2MB'den küçük olmalıdır.");
+                  e.target.value = "";
+                  return;
+                }
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                  const base64 = ev.target?.result as string;
+                  const hiddenInput = document.getElementById("pf-hidden-image") as HTMLInputElement;
+                  if (hiddenInput) {
+                    hiddenInput.value = base64;
+                    // Trigger a re-render to show preview (we can cheat by submitting or just state)
+                    hiddenInput.dispatchEvent(new Event('change', { bubbles: true }));
+                  }
+                  
+                  // Görseli anında önizleme için (DOM manipülasyonu)
+                  const img = document.querySelector('.group img') as HTMLImageElement;
+                  if (img) img.src = base64;
+                };
+                reader.readAsDataURL(file);
+              }}
+            />
+          </div>
           <div className="mb-2">
             <h2 className="text-2xl font-bold tracking-tight">{user.name}</h2>
             <p className="font-medium text-primary">{roleLabel(user.role)}</p>
@@ -66,6 +106,7 @@ export function ProfileForm({
         </div>
 
         <form action={action} className="mt-8 space-y-6">
+          <input type="hidden" id="pf-hidden-image" name="imageBase64" />
           <div className="grid gap-6 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="pf-name" className="flex items-center gap-1.5">
@@ -75,11 +116,11 @@ export function ProfileForm({
                 id="pf-name"
                 name="name"
                 defaultValue={user.name ?? ""}
-                className={`h-10 ${user.name ? "bg-muted cursor-not-allowed opacity-70" : ""}`}
+                className={`h-10 ${!!user.name && !isStaff ? "bg-muted cursor-not-allowed opacity-70" : "focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"}`}
                 required
-                readOnly={!!user.name}
+                readOnly={!!user.name && !isStaff}
               />
-              {!!user.name && <p className="text-[10px] text-muted-foreground">İsim değiştirilemez. Değişiklik için IT ile görüşün.</p>}
+              {!!user.name && !isStaff && <p className="text-[10px] text-muted-foreground">İsim değiştirilemez. Değişiklik için IT ile görüşün.</p>}
             </div>
 
             <div className="space-y-2">
@@ -91,9 +132,9 @@ export function ProfileForm({
                 name="email"
                 type="email"
                 defaultValue={user.email}
-                className={`h-10 ${user.email ? "bg-muted cursor-not-allowed opacity-70" : ""}`}
+                className={`h-10 ${!!user.email && !isStaff ? "bg-muted cursor-not-allowed opacity-70" : "focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"}`}
                 required
-                readOnly={!!user.email}
+                readOnly={!!user.email && !isStaff}
               />
             </div>
 
@@ -105,11 +146,11 @@ export function ProfileForm({
                 id="pf-departmentId"
                 name="departmentId"
                 defaultValue={user.departmentId ?? ""}
-                className="w-full rounded-lg border border-input bg-background text-foreground dark:bg-zinc-900 dark:text-zinc-100 px-3 h-10 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 shadow-xs"
-                required
+                disabled={!isStaff}
+                className={`w-full rounded-lg border border-input bg-background text-foreground dark:bg-zinc-900 dark:text-zinc-100 px-3 h-10 text-sm outline-none transition-colors shadow-xs ${!isStaff ? 'bg-muted cursor-not-allowed opacity-70' : 'focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50'}`}
               >
                 <option value="" disabled className="bg-background text-muted-foreground dark:bg-zinc-900 dark:text-zinc-400">
-                  Lütfen seçin...
+                  Henüz atanmadı
                 </option>
                 {departments.map((d: any) => (
                   <option
@@ -121,6 +162,7 @@ export function ProfileForm({
                   </option>
                 ))}
               </select>
+              {!isStaff && <p className="text-[10px] text-muted-foreground">Departman bilgisini değiştirmek için IT ile görüşün.</p>}
             </div>
 
             <div className="space-y-2">
@@ -129,21 +171,17 @@ export function ProfileForm({
               </Label>
               {(() => {
                 const assignedComputer = computers.find((c: any) => c.userId === user.id);
-                const hasComputer = !!assignedComputer;
                 return (
                   <>
-                    {hasComputer && <input type="hidden" name="computerId" value={assignedComputer.id} />}
                     <select
                       id="pf-computer"
                       name="computerId"
                       defaultValue={assignedComputer?.id ?? ""}
-                      disabled={hasComputer}
-                      className={`w-full rounded-lg border border-input bg-background text-foreground dark:bg-zinc-900 dark:text-zinc-100 px-3 h-10 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 shadow-xs ${
-                        hasComputer ? "bg-muted cursor-not-allowed opacity-70" : ""
-                      }`}
+                      disabled={!isStaff}
+                      className={`w-full rounded-lg border border-input bg-background text-foreground dark:bg-zinc-900 dark:text-zinc-100 px-3 h-10 text-sm outline-none transition-colors shadow-xs ${!isStaff ? 'bg-muted cursor-not-allowed opacity-70' : 'focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50'}`}
                     >
                       <option value="" className="bg-background text-foreground dark:bg-zinc-900 dark:text-zinc-100">
-                        (Yok)
+                        Henüz atanmadı
                       </option>
                       {computers.map((c: any) => (
                         <option
@@ -155,7 +193,7 @@ export function ProfileForm({
                         </option>
                       ))}
                     </select>
-                    {hasComputer && <p className="text-[10px] text-muted-foreground">Cihaz atanmış, değiştirilemez.</p>}
+                    {!isStaff && <p className="text-[10px] text-muted-foreground">Bilgisayar atamaları IT tarafından yönetilir.</p>}
                   </>
                 );
               })()}

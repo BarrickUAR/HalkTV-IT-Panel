@@ -34,7 +34,7 @@ async function ctxFor(ticketId: string) {
 async function itStaffIds(): Promise<string[]> {
   const rows = await prisma.user.findMany({
     where: {
-      role: { in: ["IT_AGENT", "IT_LEAD", "IT_MANAGER", "SUPER_ADMIN"] },
+      role: { in: ["IT_AGENT", "TEKNIK_YONETMEN", "TEKNIK_MUDUR", "SUPER_ADMIN"] },
       status: "ACTIVE",
     },
     select: { id: true },

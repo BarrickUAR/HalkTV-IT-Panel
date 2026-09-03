@@ -15,7 +15,12 @@ export async function signInWithCredentials(
   try {
     await signIn("credentials", { username, password, redirectTo: "/dashboard" });
   } catch (error) {
-    if (error instanceof AuthError) return "Kullanıcı adı veya şifre hatalı.";
+    if (error instanceof AuthError) {
+      if (error.cause?.err?.message) {
+        return error.cause.err.message;
+      }
+      return "Kullanıcı adı veya şifre hatalı.";
+    }
     throw error; // NEXT_REDIRECT dahil — yeniden fırlat
   }
 }

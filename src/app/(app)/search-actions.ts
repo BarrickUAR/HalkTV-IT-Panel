@@ -17,7 +17,7 @@ export async function globalSearch(query: string): Promise<SearchResults> {
 
   const user = await requireUser();
   const it = isITStaff(user.role);
-  const isManager = user.role === "IT_MANAGER" || user.role === "SUPER_ADMIN";
+  const isManager = user.role === "TEKNIK_MUDUR" || user.role === "SUPER_ADMIN";
 
   try {
     const [tickets, users] = await Promise.all([

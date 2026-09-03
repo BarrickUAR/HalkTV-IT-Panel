@@ -28,6 +28,7 @@ function SaveButton({ label }: { label: string }) {
 export function EditUserForm({
   user,
   roles,
+  departments,
 }: {
   user: {
     id: string;
@@ -41,6 +42,7 @@ export function EditUserForm({
     notes: string | null;
   };
   roles: Role[];
+  departments: { id: string; name: string }[];
 }) {
   const [state, action] = useActionState(updateUserAction, undefined);
   useEffect(() => {
@@ -106,14 +108,11 @@ export function EditUserForm({
             defaultValue={user.departmentId ?? ""}
           >
             <option value="">Belirtilmedi</option>
-            <option value="Haber Merkezi">Haber Merkezi</option>
-            <option value="Editör Katı">Editör Katı</option>
-            <option value="Reji">Reji</option>
-            <option value="Teknik">Teknik</option>
-            <option value="Prodüksiyon">Prodüksiyon</option>
-            <option value="İnsan Kaynakları">İnsan Kaynakları</option>
-            <option value="Muhasebe">Muhasebe</option>
-            <option value="Yönetim">Yönetim</option>
+            {departments.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.name}
+              </option>
+            ))}
           </select>
         </div>
         

@@ -10,23 +10,21 @@ interface UserAvatarProps {
   className?: string;
 }
 
-export function UserAvatar({ role, image, className }: UserAvatarProps) {
-  const isManager = role === "IT_MANAGER" || role === "SUPER_ADMIN" || role === "IT_LEAD" || role === "IT_AGENT";
-
-  if (isManager) {
+export function UserAvatar({ role, image, className, name }: UserAvatarProps & { name?: string | null }) {
+  if (image) {
     return (
       <div
         className={cn(
-          "flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-white border shadow-sm",
+          "flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted border shadow-sm",
           className
         )}
       >
         <Image
-          src="/halktv-logo.png"
-          alt="HalkTV IT"
+          src={image}
+          alt={name || "Profil"}
           width={40}
           height={40}
-          className="h-[60%] w-auto object-contain"
+          className="h-full w-full object-cover"
           unoptimized
         />
       </div>
@@ -36,22 +34,18 @@ export function UserAvatar({ role, image, className }: UserAvatarProps) {
   return (
     <div
       className={cn(
-        "flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted text-muted-foreground border shadow-sm",
+        "flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-white border shadow-sm",
         className
       )}
     >
-      {image ? (
-        <Image
-          src={image}
-          alt="Profil"
-          width={40}
-          height={40}
-          className="h-full w-full object-cover"
-          unoptimized
-        />
-      ) : (
-        <HiOutlineUser className="size-[55%]" />
-      )}
+      <Image
+        src="/halktv-logo.png"
+        alt="HalkTV Avatar"
+        width={40}
+        height={40}
+        className="h-[60%] w-auto object-contain opacity-80"
+        unoptimized
+      />
     </div>
   );
 }

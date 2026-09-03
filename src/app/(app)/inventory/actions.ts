@@ -14,7 +14,7 @@ const computerSchema = z.object({
 });
 
 export async function saveComputerAction(_prev: any, formData: FormData) {
-  await requireRole(["IT_AGENT", "IT_LEAD", "IT_MANAGER", "SUPER_ADMIN"]);
+  await requireRole(["IT_AGENT", "TEKNIK_YONETMEN", "TEKNIK_MUDUR", "SUPER_ADMIN"]);
 
   const raw = {
     id: (formData.get("id") as string) || undefined,
@@ -72,7 +72,7 @@ export async function saveComputerAction(_prev: any, formData: FormData) {
 }
 
 export async function deleteComputerAction(id: string) {
-  await requireRole(["IT_MANAGER", "SUPER_ADMIN"]);
+  await requireRole(["TEKNIK_MUDUR", "SUPER_ADMIN"]);
 
   await prisma.computer.delete({
     where: { id },

@@ -42,7 +42,7 @@ async function main() {
     where: { name: "Teknik Servis & IT" },
   });
 
-  // 2. İlk SUPER_ADMIN Hesabı
+  // 2. İlk TEKNIK_MUDUR Hesabı
   const username = (process.env.SEED_ADMIN_USERNAME ?? "admin").toLowerCase();
   const password = process.env.SEED_ADMIN_PASSWORD ?? "HalkTV2026!";
   const email = process.env.SEED_ADMIN_EMAIL ?? "admin@halktv.com.tr";
@@ -54,8 +54,8 @@ async function main() {
     create: {
       username,
       email,
-      name: "IT Yönetici",
-      role: "SUPER_ADMIN",
+      name: "Teknik Müdür",
+      role: "TEKNIK_MUDUR",
       status: "ACTIVE",
       departmentId: itDept?.id,
       passwordHash,

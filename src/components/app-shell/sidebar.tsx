@@ -44,7 +44,7 @@ export function Sidebar({ role }: { role: Role }) {
   const pathname = usePathname();
   const [counts, setCounts] = useState({ tickets: 0 });
   const it = isITStaff(role);
-  const isManager = role === "IT_MANAGER" || role === "SUPER_ADMIN";
+  const isManager = role === "TEKNIK_MUDUR" || role === "SUPER_ADMIN";
 
   useEffect(() => {
     let live = true;
@@ -72,7 +72,7 @@ export function Sidebar({ role }: { role: Role }) {
       items: [
         {
           href: "/dashboard",
-          label: "Panel",
+          label: "Anasayfa",
           icon: HiOutlineSquares2X2,
           show: true,
         },
@@ -94,19 +94,19 @@ export function Sidebar({ role }: { role: Role }) {
           href: "/users",
           label: "Kullanıcılar",
           icon: HiOutlineUsers,
-          show: isManager,
+          show: can(role, "user:manage"),
         },
         {
           href: "/departments",
           label: "Departmanlar",
           icon: HiOutlineCube,
-          show: isManager,
+          show: can(role, "location:manage"),
         },
         {
           href: "/inventory",
           label: "Envanter (Cihazlar)",
           icon: HiOutlineComputerDesktop,
-          show: isManager,
+          show: can(role, "asset:manage"),
         },
         {
           href: "/audit",
@@ -130,7 +130,7 @@ export function Sidebar({ role }: { role: Role }) {
     },
     {
       items: [
-        { href: "/settings", label: "Ayarlar", icon: HiOutlineCog8Tooth, show: true },
+        { href: "/profile", label: "Profilim", icon: HiOutlineCog8Tooth, show: true },
       ],
     },
   ];

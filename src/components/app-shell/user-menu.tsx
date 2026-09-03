@@ -50,17 +50,19 @@ export function UserMenu({
       </DropdownMenuTrigger>
 
       <DropdownMenuContent align="end" className="w-56 p-1.5 shadow-xl border bg-popover text-popover-foreground">
-        <DropdownMenuLabel className="p-2 font-normal">
-          <div className="flex flex-col space-y-1">
-            <p className="text-sm font-semibold leading-none">{name ?? "Kullanıcı"}</p>
-            <p className="text-xs leading-none text-muted-foreground truncate">{email}</p>
-            <div className="pt-1">
-              <span className="inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-medium bg-primary/10 text-primary border border-primary/20">
-                {roleLabel(role)}
-              </span>
+        <DropdownMenuGroup>
+          <DropdownMenuLabel className="p-2 font-normal">
+            <div className="flex flex-col space-y-1">
+              <p className="text-sm font-semibold leading-none">{name ?? "Kullanıcı"}</p>
+              <p className="text-xs leading-none text-muted-foreground truncate">{email}</p>
+              <div className="pt-1">
+                <span className="inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-medium bg-primary/10 text-primary border border-primary/20">
+                  {roleLabel(role)}
+                </span>
+              </div>
             </div>
-          </div>
-        </DropdownMenuLabel>
+          </DropdownMenuLabel>
+        </DropdownMenuGroup>
 
         <DropdownMenuSeparator />
 
@@ -74,7 +76,7 @@ export function UserMenu({
           </DropdownMenuItem>
 
           <DropdownMenuItem
-            onClick={() => router.push("/settings")}
+            onClick={() => router.push("/profile")}
             className="flex items-center gap-2 w-full cursor-pointer py-2"
           >
             <HiOutlineCog6Tooth className="size-4 text-muted-foreground" />

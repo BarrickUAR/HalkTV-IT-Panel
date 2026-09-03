@@ -14,7 +14,7 @@ export function Topbar({
   role: Role;
 }) {
   return (
-    <header className="flex h-14 shrink-0 items-center justify-between gap-2 border-b bg-background/95 backdrop-blur-xs px-4 lg:px-6">
+    <header className="sticky top-0 z-40 flex h-14 shrink-0 items-center justify-between gap-2 border-b bg-background/95 backdrop-blur-md px-4 lg:px-6">
       <GlobalSearch />
       <div className="flex items-center gap-3">
         <NotificationBell />

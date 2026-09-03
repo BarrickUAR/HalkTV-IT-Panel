@@ -1,22 +1,23 @@
+import { auth } from "@/auth";
 import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
 
-const PUBLIC_PATHS = ["/login", "/api/auth"];
+export default auth((req) => {
+  const { nextUrl, auth: session } = req;
+  const pathname = nextUrl.pathname;
 
-export function proxy(request: NextRequest) {
-  const { pathname } = request.nextUrl;
-
-  // Public rotalar — her zaman geçir
-  if (PUBLIC_PATHS.some((p) => pathname.startsWith(p))) {
-    return NextResponse.next();
+  // Kullanıcı giriş yapmış
+  if (session?.user) {
+    // Adı yoksa ve onboarding'de değilse → onboarding'e yönlendir
+    if (!session.user.name && pathname !== "/onboarding") {
+      return NextResponse.redirect(new URL("/onboarding", nextUrl));
+    }
   }
 
-  // NextAuth oturum kontrolü
   return NextResponse.next();
-}
+});
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|halktv-logo.png|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!api|_next/static|_next/image|favicon.ico|apple-icon.png|icon.png|login|onboarding|halktv-logo.png|bg-chat.png|uploads).*)",
   ],
 };

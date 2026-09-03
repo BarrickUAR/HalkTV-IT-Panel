@@ -47,10 +47,18 @@ const IT_AGENT: Permission[] = [
   "ticket:comment:internal",
   "time:log",
   "user:read",
+  "asset:manage",
+  "asset:assign",
+  "reservation:manage",
+  "consumable:manage",
+  "maintenance:manage",
+  "account:manage",
+  "lifecycle:manage",
+  "kb:manage",
 ];
 
 // IT Yöneticisi
-const IT_LEAD: Permission[] = [
+const TEKNIK_YONETMEN: Permission[] = [
   ...IT_AGENT,
   "report:view",
   "audit:read",
@@ -58,14 +66,22 @@ const IT_LEAD: Permission[] = [
   "announcement:manage",
   "oncall:manage",
   "location:manage",
+  "user:manage",
 ];
 
 // IT Müdürü
-const IT_MANAGER: Permission[] = [...IT_LEAD, "ticket:delete", "user:manage"];
+const TEKNIK_MUDUR: Permission[] = [
+  ...TEKNIK_YONETMEN, 
+  "ticket:delete", 
+  "user:manage",
+  "role:manage",
+  "settings:manage",
+  "integration:manage",
+];
 
 // Sistem Yöneticisi
 const SUPER_ADMIN: Permission[] = [
-  ...IT_MANAGER,
+  ...TEKNIK_MUDUR,
   "role:manage",
   "settings:manage",
   "integration:manage",
@@ -74,8 +90,8 @@ const SUPER_ADMIN: Permission[] = [
 export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   EMPLOYEE,
   IT_AGENT,
-  IT_LEAD,
-  IT_MANAGER,
+  TEKNIK_YONETMEN,
+  TEKNIK_MUDUR,
   SUPER_ADMIN,
 };
 
@@ -88,8 +104,8 @@ export function can(role: Role, permission: Permission): boolean {
 export function isITStaff(role: Role): boolean {
   return (
     role === "IT_AGENT" ||
-    role === "IT_LEAD" ||
-    role === "IT_MANAGER" ||
+    role === "TEKNIK_YONETMEN" ||
+    role === "TEKNIK_MUDUR" ||
     role === "SUPER_ADMIN"
   );
 }
