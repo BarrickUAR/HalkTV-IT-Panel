@@ -2,9 +2,7 @@
 
 import { requireUser } from "@/lib/auth-helpers";
 import { isITStaff } from "@/lib/rbac/permissions";
-import { DEMO_TICKETS, DEMO_USERS } from "@/lib/demo-data";
-
-const IS_DEMO = process.env.DEMO_MODE === "true";
+import { prisma } from "@/lib/prisma";
 
 export type SearchResults = {
   tickets: { id: string; number: string; title: string }[];
@@ -21,37 +19,7 @@ export async function globalSearch(query: string): Promise<SearchResults> {
   const it = isITStaff(user.role);
   const isManager = user.role === "IT_MANAGER" || user.role === "SUPER_ADMIN";
 
-  if (IS_DEMO) {
-    const tickets = DEMO_TICKETS.filter(
-      (t) =>
-        (it || t.requesterId === user.id) &&
-        (t.number.toLowerCase().includes(q) ||
-          t.title.toLowerCase().includes(q)),
-    )
-      .slice(0, 6)
-      .map((t) => ({ id: t.id, number: t.number, title: t.title }));
-
-    const users = isManager
-      ? DEMO_USERS.filter(
-          (u) =>
-            u.name?.toLowerCase().includes(q) ||
-            u.email.toLowerCase().includes(q),
-        )
-          .slice(0, 5)
-          .map((u) => ({
-            id: u.id,
-            name: u.name ?? u.email,
-            sub: u.title ?? u.email,
-          }))
-      : [];
-
-    return { tickets, users };
-  }
-
-  // ─── Gerçek DB ────────────────────────────────────────────
   try {
-    const { prisma } = await import("@/lib/prisma");
-
     const [tickets, users] = await Promise.all([
       prisma.ticket.findMany({
         where: {

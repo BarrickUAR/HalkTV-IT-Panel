@@ -21,14 +21,12 @@ import {
   STATUS_BADGE,
   STATUS_LABELS,
 } from "@/lib/ticket-labels";
-import { DEMO_TICKETS, DEMO_IT_AGENTS } from "@/lib/demo-data";
+import { prisma } from "@/lib/prisma";
 
 export const metadata: Metadata = { title: "Talepler" };
 
-const IS_DEMO = process.env.DEMO_MODE === "true";
-
 const fieldClass =
-  "h-9 rounded-lg border border-input bg-transparent px-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50";
+  "h-9 rounded-lg border border-input bg-background text-foreground dark:bg-zinc-900 dark:text-zinc-100 px-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50";
 
 type Search = {
   q?: string;
@@ -75,77 +73,49 @@ export default async function TicketsPage({
       : undefined;
   const atanan = it ? (sp.atanan ?? "") : "";
 
-  let tickets: TicketRow[];
-  const agents: { id: string; name: string | null; email: string }[] = IS_DEMO ? DEMO_IT_AGENTS : [];
-
-  if (IS_DEMO) {
-    // ─── Demo: istemci tarafı filtre ─────────────────────────
-    tickets = DEMO_TICKETS.filter((t) => {
-      if (!it && t.requesterId !== "demo-emp-1") return false;
-      if (status && t.status !== status) return false;
-      if (priority && t.priority !== priority) return false;
-      if (category && t.category !== category) return false;
-      if (atanan === "yok" && t.assigneeId !== null) return false;
-      if (atanan && atanan !== "yok" && t.assigneeId !== atanan) return false;
-      if (q) {
-        const ql = q.toLowerCase();
-        if (
-          !t.number.toLowerCase().includes(ql) &&
-          !t.title.toLowerCase().includes(ql)
-        )
-          return false;
-      }
-      return true;
-    }) as unknown as TicketRow[];
-  } else {
-    // ─── Gerçek DB ────────────────────────────────────────────
-    const { prisma } = await import("@/lib/prisma");
-    const { Prisma } = await import("@prisma/client");
-
-    const where: Prisma.TicketWhereInput = {
-      ...(it ? {} : { requesterId: user.id }),
-      ...(status ? { status } : {}),
-      ...(priority ? { priority } : {}),
-      ...(category ? { category } : {}),
-      ...(atanan === "yok"
-        ? { assigneeId: null }
-        : atanan
-          ? { assigneeId: atanan }
-          : {}),
-      ...(q
-        ? {
-            OR: [
-              { number: { contains: q, mode: "insensitive" } },
-              { title: { contains: q, mode: "insensitive" } },
-            ],
-          }
+  const where: Prisma.TicketWhereInput = {
+    ...(it ? {} : { requesterId: user.id }),
+    ...(status ? { status } : {}),
+    ...(priority ? { priority } : {}),
+    ...(category ? { category } : {}),
+    ...(atanan === "yok"
+      ? { assigneeId: null }
+      : atanan
+        ? { assigneeId: atanan }
         : {}),
-    };
+    ...(q
+      ? {
+          OR: [
+            { number: { contains: q, mode: "insensitive" } },
+            { title: { contains: q, mode: "insensitive" } },
+          ],
+        }
+      : {}),
+  };
 
-    const [t, a] = await Promise.all([
-      prisma.ticket.findMany({
-        where,
-        orderBy: { createdAt: "desc" },
-        take: 100,
-        include: {
-          requester: { select: { name: true, email: true } },
-          assignee: { select: { name: true } },
-        },
-      }),
-      it
-        ? prisma.user.findMany({
-            where: {
-              role: { in: ["IT_AGENT", "IT_LEAD", "IT_MANAGER", "SUPER_ADMIN"] },
-              status: "ACTIVE",
-            },
-            select: { id: true, name: true, email: true },
-            orderBy: { name: "asc" },
-          })
-        : Promise.resolve([]),
-    ]);
-    tickets = t as TicketRow[];
-    if (it) agents.push(...a);
-  }
+  const [t, a] = await Promise.all([
+    prisma.ticket.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      take: 100,
+      include: {
+        requester: { select: { name: true, email: true } },
+        assignee: { select: { name: true } },
+      },
+    }),
+    it
+      ? prisma.user.findMany({
+          where: {
+            role: { in: ["IT_AGENT", "IT_LEAD", "IT_MANAGER", "SUPER_ADMIN"] },
+            status: "ACTIVE",
+          },
+          select: { id: true, name: true, email: true },
+          orderBy: { name: "asc" },
+        })
+      : Promise.resolve([]),
+  ]);
+  const tickets = t as TicketRow[];
+  const agents = a;
 
   const hasFilter = Boolean(q || status || priority || category || atanan);
 

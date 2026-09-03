@@ -19,51 +19,13 @@ export default async function KnowledgeBasePage(props: { searchParams: Promise<{
   const searchParams = await props.searchParams;
   const q = searchParams.q || "";
 
-  let articles: any[] = [];
-  
-  if (process.env.DEMO_MODE === "true") {
-    articles = [
-      {
-        id: "kb-1",
-        title: "Yazıcıdan çıktı alamıyorum, ne yapmalıyım?",
-        content: "Yazıcının fişini çekip takın. Eğer IP değişmişse IT ekibine talep açın.",
-        category: "HARDWARE",
-        viewCount: 145,
-        isPublished: true,
-        updatedAt: new Date(),
-      },
-      {
-        id: "kb-2",
-        title: "Ortak Klasör (NAS) Şifremi Unuttum",
-        content: "Ortak klasör şifreleri Active Directory (Bilgisayar) şifrenizle aynıdır. Bilgisayar şifrenizi sıfırladığınızda klasör şifreniz de sıfırlanır.",
-        category: "ACCOUNT_ACCESS",
-        viewCount: 89,
-        isPublished: true,
-        updatedAt: new Date(),
-      },
-      {
-        id: "kb-3",
-        title: "VPN Bağlantısı Kopuyor",
-        content: "Cisco AnyConnect'i kapatıp tekrar açın. Wi-Fi yerine kablolu bağlantı kullanmayı deneyin.",
-        category: "NETWORK",
-        viewCount: 234,
-        isPublished: true,
-        updatedAt: new Date(),
-      }
-    ];
-
-    if (q) {
-      articles = articles.filter(a => a.title.toLowerCase().includes(q.toLowerCase()));
-    }
-  } else {
-    articles = await prisma.knowledgeArticle.findMany({
-      where: {
-        isPublished: true,
-        ...(q ? { title: { contains: q, mode: "insensitive" } } : {}),
-      },
-      orderBy: { viewCount: "desc" }
-    });
-  }
+  const articles = await prisma.knowledgeArticle.findMany({
+    where: {
+      isPublished: true,
+      ...(q ? { title: { contains: q, mode: "insensitive" } } : {}),
+    },
+    orderBy: { viewCount: "desc" },
+  });
 
   return (
     <div className="mx-auto max-w-5xl space-y-8">

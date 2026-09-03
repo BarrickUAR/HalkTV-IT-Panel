@@ -20,23 +20,25 @@ export default async function UsersPage(props: {
   const q = searchParams.q ?? "";
   const roleFilter = searchParams.role ?? "";
 
-  let users: any[] = [];
-  let departments: any[] = [];
-  if (process.env.DEMO_MODE === "true") {
-    // ... demo mode details
-  } else {
-    // DB
-    users = await prisma.user.findMany({
+  const [users, departments] = await Promise.all([
+    prisma.user.findMany({
       orderBy: { createdAt: "desc" },
       where: {
         AND: [
-          q ? { OR: [{ name: { contains: q, mode: "insensitive" } }, { email: { contains: q, mode: "insensitive" } }] } : {},
+          q
+            ? {
+                OR: [
+                  { name: { contains: q, mode: "insensitive" } },
+                  { email: { contains: q, mode: "insensitive" } },
+                ],
+              }
+            : {},
           roleFilter ? { role: roleFilter as any } : {},
         ],
       },
-    });
-    departments = await prisma.department.findMany({ orderBy: { name: "asc" } });
-  }
+    }),
+    prisma.department.findMany({ orderBy: { name: "asc" } }),
+  ]);
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">

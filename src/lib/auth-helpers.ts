@@ -4,31 +4,18 @@ import type { Role } from "@prisma/client";
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { getDemoUser } from "@/lib/demo-auth";
 
 /** Oturumdaki kullanıcı (yoksa null) — hafif, DB'ye gitmez. */
 export async function getCurrentUser() {
-  // Demo mod
-  if (process.env.DEMO_MODE === "true") {
-    return getDemoUser();
-  }
   const session = await auth();
   return session?.user ?? null;
 }
 
 /**
- * Giriş zorunlu. Demo modda cookie'den, gerçek modda DB'den okur.
- * Oturum yoksa /login'e atar.
+ * Giriş zorunlu. Oturumu NextAuth + DB üzerinden doğrular.
+ * Oturum yoksa /login'e yönlendirir.
  */
 export const requireUser = cache(async () => {
-  // ─── Demo mod ────────────────────────────────────────────────
-  if (process.env.DEMO_MODE === "true") {
-    const demoUser = await getDemoUser();
-    if (!demoUser) redirect("/login");
-    return demoUser;
-  }
-
-  // ─── Gerçek mod ───────────────────────────────────────────────
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
@@ -50,6 +37,7 @@ export const requireUser = cache(async () => {
       },
     },
   });
+
   if (!user || user.status !== "ACTIVE") redirect("/login");
   return user;
 });

@@ -67,37 +67,29 @@ export default async function TicketDetailPage({
   const user = await requireUser();
   const it = isITStaff(user.role);
 
-  let ticket: any;
-  let agents: any[] = [];
-  
-  if (process.env.DEMO_MODE === "true") {
-    const { DEMO_TICKETS, DEMO_IT_AGENTS } = await import("@/lib/demo-data");
-    ticket = DEMO_TICKETS.find((t) => t.id === id);
-    if (it) agents = DEMO_IT_AGENTS;
-  } else {
-    ticket = await prisma.ticket.findUnique({
-      where: { id },
-      include: {
-        requester: { select: { name: true, email: true, department: { select: { name: true } }, computers: { select: { name: true } } } },
-        assignee: { select: { name: true } },
-        survey: true,
-        timeEntries: {
-          orderBy: { createdAt: "desc" },
-          include: { user: { select: { name: true, email: true } } },
-        },
+  const ticket = await prisma.ticket.findUnique({
+    where: { id },
+    include: {
+      requester: { select: { name: true, email: true, department: { select: { name: true } }, computers: { select: { name: true } } } },
+      assignee: { select: { name: true } },
+      survey: true,
+      timeEntries: {
+        orderBy: { createdAt: "desc" },
+        include: { user: { select: { name: true, email: true } } },
       },
-    });
-    if (it) {
-      agents = await prisma.user.findMany({
+    },
+  });
+
+  const agents = it
+    ? await prisma.user.findMany({
         where: {
           role: { in: ["IT_AGENT", "IT_LEAD", "IT_MANAGER", "SUPER_ADMIN"] },
           status: "ACTIVE",
         },
         select: { id: true, name: true, email: true },
         orderBy: { name: "asc" },
-      });
-    }
-  }
+      })
+    : [];
 
   if (!ticket || (!it && ticket.requesterId !== user.id)) notFound();
 
@@ -176,18 +168,17 @@ export default async function TicketDetailPage({
                   {PRIORITY_LABELS[ticket.priority as keyof typeof PRIORITY_LABELS]}
                 </Badge>
               </Row>
-              <Row label="Kategori" value={CATEGORY_LABELS[ticket.category as keyof typeof CATEGORY_LABELS]} />
-              {ticket.location ? (
-                <Row label="Kat/Departman" value={ticket.location} />
+              {(ticket as any).location ? (
+                <Row label="Kat/Departman" value={(ticket as any).location} />
               ) : null}
               <Row
                 label="Talep eden"
                 value={ticket.requester.name ?? ticket.requester.email ?? "—"}
               />
-              {it && ticket.requester.computerName ? (
+              {it && ticket.requester.computers?.[0]?.name ? (
                 <Row
                   label="Bilgisayar Adı"
-                  value={ticket.requester.computerName}
+                  value={ticket.requester.computers[0].name}
                 />
               ) : null}
               {!it ? (

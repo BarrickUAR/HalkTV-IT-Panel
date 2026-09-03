@@ -22,12 +22,9 @@ import { cn } from "@/lib/utils";
 import type { TicketStatus } from "@prisma/client";
 import { STATUS_BADGE, STATUS_LABELS } from "@/lib/ticket-labels";
 
-// Demo mod
-import { DEMO_TICKETS, DEMO_USERS, getDemoStats } from "@/lib/demo-data";
+import { prisma } from "@/lib/prisma";
 
 export const metadata: Metadata = { title: "Panel" };
-
-const IS_DEMO = process.env.DEMO_MODE === "true";
 
 type Stat = { icon: IconType; label: string; value: number; tone: string; href?: string };
 
@@ -75,74 +72,13 @@ export default async function DashboardPage() {
   let stats: Stat[];
   let recent: RecentTicket[];
 
-  if (IS_DEMO) {
-    // ─── Demo verisi ──────────────────────────────────────────
-    if (it) {
-      const s = getDemoStats();
-      stats = [
-        {
-          icon: HiOutlineTicket,
-          label: "Açık talepler",
-          value: s.open,
-          tone: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
-          href: "/tickets?durum=OPEN",
-        },
-        {
-          icon: HiOutlineClock,
-          label: "İşlemde",
-          value: s.inProgress,
-          tone: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
-          href: "/tickets?durum=IN_PROGRESS",
-        },
-        {
-          icon: HiOutlineExclamationTriangle,
-          label: "Atanmamış",
-          value: s.unassigned,
-          tone: "bg-red-500/10 text-red-600 dark:text-red-400",
-          href: "/tickets?atanan=yok",
-        },
-        {
-          icon: HiOutlineUsers,
-          label: "Kullanıcı",
-          value: DEMO_USERS.length,
-          tone: "bg-primary/10 text-primary",
-          href: "/users",
-        },
-      ];
-      recent = DEMO_TICKETS.slice(0, 6) as RecentTicket[];
-    } else {
-      const myTickets = DEMO_TICKETS.filter((t) => t.requesterId === "demo-emp-1");
-      stats = [
-        {
-          icon: HiOutlineTicket,
-          label: "Açık taleplerim",
-          value: myTickets.filter((t) =>
-            ["OPEN", "IN_PROGRESS", "WAITING_REQUESTER"].includes(t.status),
-          ).length,
-          tone: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
-        },
-        {
-          icon: HiOutlineCheckCircle,
-          label: "Çözülen",
-          value: myTickets.filter((t) =>
-            ["RESOLVED", "CLOSED"].includes(t.status),
-          ).length,
-          tone: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
-        },
-      ];
-      recent = myTickets.slice(0, 6) as RecentTicket[];
-    }
-  } else {
-    // ─── Gerçek veritabanı ────────────────────────────────────
-    const { prisma } = await import("@/lib/prisma");
-
-    const recentSelect = {
-      id: true,
-      number: true,
-      title: true,
-      status: true,
-      createdAt: true,
-    } as const;
+  const recentSelect = {
+    id: true,
+    number: true,
+    title: true,
+    status: true,
+    createdAt: true,
+  } as const;
 
     if (it) {
       const [open, inProgress, unassigned, users, recentTickets] =
@@ -224,7 +160,6 @@ export default async function DashboardPage() {
       ];
       recent = recentTickets;
     }
-  }
 
   return (
     <div className="mx-auto max-w-5xl space-y-8">

@@ -23,12 +23,6 @@ export async function createArticleAction(_prev: any, formData: FormData) {
     return { error: parsed.error.issues[0]?.message };
   }
 
-  if (process.env.DEMO_MODE === "true") {
-    // Demo modda ekleme simülasyonu
-    revalidatePath("/knowledge");
-    redirect("/knowledge");
-  }
-
   await prisma.knowledgeArticle.create({
     data: {
       title: parsed.data.title,

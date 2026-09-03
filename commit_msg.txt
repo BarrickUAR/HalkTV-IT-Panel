@@ -1,1 +1,1 @@
-fix: resolve dark/light mode issues, style native select dropdowns, and add user profile dropdown menu
+refactor: completely remove demo mode and all mock data, switch to pure database-driven architecture

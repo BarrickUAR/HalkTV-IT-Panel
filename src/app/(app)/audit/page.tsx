@@ -6,23 +6,11 @@ import { tr } from "date-fns/locale";
 export default async function AuditLogPage() {
   const user = await requireRole(["IT_AGENT", "IT_LEAD", "IT_MANAGER", "SUPER_ADMIN"]);
 
-  // Demo modu verisi (DB yokken test için)
-  const isDemo = process.env.DEMO_MODE === "true";
-  let logs: any[] = [];
-
-  if (isDemo) {
-    logs = [
-      { id: 1, action: "Talep atandı", entityType: "Ticket", entityId: "HTV-2026-000001", actor: { name: "Berk Yılmaz" }, createdAt: new Date(Date.now() - 1000 * 60 * 5) },
-      { id: 2, action: "Talep kapatıldı", entityType: "Ticket", entityId: "HTV-2026-000004", actor: { name: "Selin Aksoy" }, createdAt: new Date(Date.now() - 1000 * 60 * 120) },
-      { id: 3, action: "Kullanıcı departmanı güncellendi", entityType: "User", entityId: "Ahmet Çelik", actor: { name: "Berk Yılmaz" }, createdAt: new Date(Date.now() - 1000 * 60 * 60 * 5) },
-    ];
-  } else {
-    logs = await prisma.auditLog.findMany({
-      orderBy: { createdAt: "desc" },
-      take: 100,
-      include: { actor: { select: { name: true, email: true } } }
-    });
-  }
+  const logs = await prisma.auditLog.findMany({
+    orderBy: { createdAt: "desc" },
+    take: 100,
+    include: { actor: { select: { name: true, email: true } } },
+  });
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">

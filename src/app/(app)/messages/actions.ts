@@ -2,9 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth-helpers";
-import { DEMO_USERS } from "@/lib/demo-data";
-
-const IS_DEMO = process.env.DEMO_MODE === "true";
+import { prisma } from "@/lib/prisma";
+import { notify } from "@/lib/notify";
+import { ROLE_LABELS } from "@/lib/rbac/roles";
 
 export type MessageDTO = {
   id: string;
@@ -22,49 +22,13 @@ export type Contact = {
   image?: string | null;
 };
 
-const DEMO_MESSAGES: MessageDTO[] = [
-  {
-    id: "dm-1",
-    body: "Merhaba, VPN sorununu araştırıyorum.",
-    fromMe: false,
-    createdAt: new Date(Date.now() - 3600 * 1000).toISOString(),
-  },
-  {
-    id: "dm-2",
-    body: "Teşekkürler, ne zaman çözülecek?",
-    fromMe: true,
-    createdAt: new Date(Date.now() - 3500 * 1000).toISOString(),
-  },
-];
-
 export async function fetchContacts(
   query?: string,
 ): Promise<{ contacts: Contact[]; totalUnread: number }> {
   const me = await requireUser();
   const q = (query ?? "").trim().toLowerCase();
 
-  if (IS_DEMO) {
-    const contacts = DEMO_USERS.filter(
-      (u) =>
-        u.id !== me.id &&
-        (!q ||
-          u.name?.toLowerCase().includes(q) ||
-          u.email.toLowerCase().includes(q)),
-    ).map((u) => ({
-      id: u.id,
-      name: u.name ?? u.email,
-      sub: u.title ?? u.role,
-      unread: 0,
-      role: u.role,
-      image: u.image,
-    }));
-    return { contacts, totalUnread: 0 };
-  }
-
   try {
-    const { prisma } = await import("@/lib/prisma");
-    const { ROLE_LABELS } = await import("@/lib/rbac/roles");
-
     const [users, unread] = await Promise.all([
       prisma.user.findMany({
         where: {
@@ -111,10 +75,8 @@ export async function fetchContacts(
 }
 
 export async function unreadMessageCount(): Promise<number> {
-  if (IS_DEMO) return 0;
   try {
     const me = await requireUser();
-    const { prisma } = await import("@/lib/prisma");
     return prisma.directMessage.count({
       where: { recipientId: me.id, isRead: false },
     });
@@ -124,10 +86,8 @@ export async function unreadMessageCount(): Promise<number> {
 }
 
 export async function fetchThread(otherId: string): Promise<MessageDTO[]> {
-  if (IS_DEMO) return DEMO_MESSAGES;
   try {
     const me = await requireUser();
-    const { prisma } = await import("@/lib/prisma");
     const rows = await prisma.directMessage.findMany({
       where: {
         OR: [
@@ -153,7 +113,6 @@ export async function sendMessage(
   recipientId: string,
   body: string,
 ): Promise<{ ok: boolean; error?: string }> {
-  if (IS_DEMO) return { ok: true };
   try {
     const me = await requireUser();
     const text = body.trim();
@@ -161,9 +120,6 @@ export async function sendMessage(
     if (text.length > 4000) return { ok: false, error: "Mesaj çok uzun." };
     if (recipientId === me.id)
       return { ok: false, error: "Kendine mesaj gönderemezsin." };
-
-    const { prisma } = await import("@/lib/prisma");
-    const { notify } = await import("@/lib/notify");
 
     const recipient = await prisma.user.findUnique({
       where: { id: recipientId },
@@ -186,15 +142,13 @@ export async function sendMessage(
     revalidatePath("/messages");
     return { ok: true };
   } catch {
-    return { ok: false, error: "Gönderilmedi." };
+    return { ok: false, error: "Gönderilemedi." };
   }
 }
 
 export async function markThreadRead(otherId: string): Promise<void> {
-  if (IS_DEMO) return;
   try {
     const me = await requireUser();
-    const { prisma } = await import("@/lib/prisma");
     await prisma.directMessage.updateMany({
       where: { senderId: otherId, recipientId: me.id, isRead: false },
       data: { isRead: true, readAt: new Date() },

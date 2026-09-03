@@ -2,22 +2,19 @@
 
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
-import { HiOutlineArrowRight, HiOutlineComputerDesktop, HiOutlineUser } from "react-icons/hi2";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 
-import { signInWithCredentials, signInAsITDemo, signInAsEmployeeDemo } from "./actions";
-
-// ─── Gerçek giriş formu ───────────────────────────────────────────────────────
+import { signInWithCredentials } from "./actions";
 
 function SubmitButton() {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" className="h-11 w-full" disabled={pending}>
-      {pending ? "Giriş yapılıyor…" : "Giriş yap"}
+    <Button type="submit" className="h-11 w-full text-base font-semibold" disabled={pending}>
+      {pending ? "Giriş yapılıyor…" : "Giriş Yap"}
     </Button>
   );
 }
@@ -31,21 +28,21 @@ function CredentialsForm() {
   return (
     <form action={credAction} className="space-y-4">
       <div className="space-y-2">
-        <Label htmlFor="username">Kullanıcı adı</Label>
+        <Label htmlFor="login-username">Kullanıcı adı veya E-posta</Label>
         <Input
-          id="username"
+          id="login-username"
           name="username"
+          type="text"
           required
-          autoFocus
-          placeholder="ör. berk"
+          placeholder="ör. admin veya ad@halktv.com.tr"
           className="h-11"
           autoComplete="username"
         />
       </div>
       <div className="space-y-2">
-        <Label htmlFor="password">Şifre</Label>
+        <Label htmlFor="login-password">Şifre</Label>
         <Input
-          id="password"
+          id="login-password"
           name="password"
           type="password"
           required
@@ -55,7 +52,7 @@ function CredentialsForm() {
         />
       </div>
       {credError ? (
-        <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
+        <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive font-medium">
           {credError}
         </p>
       ) : null}
@@ -64,56 +61,6 @@ function CredentialsForm() {
   );
 }
 
-// ─── Demo butonları ────────────────────────────────────────────────────────────
-
-function DemoButtons() {
-  return (
-    <div className="grid grid-cols-2 gap-3">
-      <form action={signInAsITDemo} className="w-full">
-        <button
-          type="submit"
-          className={cn(
-            "group flex h-full w-full flex-col items-center gap-3 rounded-xl border-2 border-dashed p-4 text-center transition-all",
-            "border-primary/30 hover:border-primary hover:bg-primary/5",
-            "active:scale-95",
-          )}
-        >
-          <div className="flex size-12 items-center justify-center rounded-xl bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors shadow-sm">
-            <HiOutlineComputerDesktop className="size-6" />
-          </div>
-          <div>
-            <p className="text-sm font-semibold">IT Personeli</p>
-            <p className="text-[11px] text-muted-foreground mt-0.5">Yönetici Paneli</p>
-          </div>
-        </button>
-      </form>
-
-      <form action={signInAsEmployeeDemo} className="w-full">
-        <button
-          type="submit"
-          className={cn(
-            "group flex h-full w-full flex-col items-center gap-3 rounded-xl border-2 border-dashed p-4 text-center transition-all",
-            "border-muted-foreground/20 hover:border-foreground/40 hover:bg-muted/60",
-            "active:scale-95",
-          )}
-        >
-          <div className="flex size-12 items-center justify-center rounded-xl bg-muted text-muted-foreground group-hover:bg-foreground/10 transition-colors shadow-sm">
-            <HiOutlineUser className="size-6" />
-          </div>
-          <div>
-            <p className="text-sm font-semibold">Çalışan</p>
-            <p className="text-[11px] text-muted-foreground mt-0.5">Talep Portalı</p>
-          </div>
-        </button>
-      </form>
-    </div>
-  );
-}
-
-// ─── Ana bileşen ───────────────────────────────────────────────────────────────
-
-const IS_DEMO = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
-
 export function AuthPanel() {
   return (
     <div className="w-full max-w-sm space-y-6">
@@ -121,34 +68,21 @@ export function AuthPanel() {
       <div className="space-y-1 text-center">
         <h1 className="text-2xl font-bold tracking-tight">Hoş Geldiniz</h1>
         <p className="text-sm text-muted-foreground">
-          IT destek portalına giriş yapın.
+          HalkTV IT teknik destek portalına giriş yapın.
         </p>
       </div>
 
       <CredentialsForm />
-      
+
       <Divider />
-      
+
       <div className="space-y-3">
         <MicrosoftButton />
       </div>
 
       <p className="text-center text-xs text-muted-foreground">
-        Hesabınız yoksa IT ekibiyle iletişime geçin.
+        Giriş bilgileriniz yoksa IT ekibiyle iletişime geçin.
       </p>
-
-      {/* Demo modu aktifse alta bilgi kutusu olarak koy */}
-      {IS_DEMO && (
-        <div className="mt-8 rounded-xl border bg-muted/30 p-4">
-          <div className="mb-3">
-            <p className="text-sm font-semibold">Demo Modu Aktif</p>
-            <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
-              Şu an veritabanı bağlantısı yok. Sistemi test etmek için şifre girmeden aşağıdaki rollerle devam edebilirsiniz.
-            </p>
-          </div>
-          <DemoButtons />
-        </div>
-      )}
     </div>
   );
 }
@@ -169,16 +103,15 @@ function MicrosoftButton() {
     <button
       type="button"
       onClick={() => {
-        /* Microsoft Entra ID OAuth — yakında aktif */
         window.location.href = "/api/auth/signin/microsoft-entra-id";
       }}
       className={cn(
         "flex h-11 w-full items-center justify-center gap-3 rounded-lg border bg-background px-4 text-sm font-medium",
-        "transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        "transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer",
       )}
     >
       <MicrosoftIcon />
-      Kurumsal hesapla devam et
+      Kurumsal Microsoft ile devam et
     </button>
   );
 }

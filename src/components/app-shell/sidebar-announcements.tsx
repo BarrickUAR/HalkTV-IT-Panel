@@ -3,40 +3,26 @@ import { format } from "date-fns";
 import { tr } from "date-fns/locale";
 
 import { cn } from "@/lib/utils";
-
-const IS_DEMO = process.env.DEMO_MODE === "true";
+import { prisma } from "@/lib/prisma";
 
 export async function SidebarAnnouncements() {
   let items: any[] = [];
 
-  if (IS_DEMO) {
-    items = [
-      {
-        id: "demo-1",
-        title: "Sistem Bakımı",
-        body: "Bu akşam 22:00'da planlı kesinti yapılacaktır.",
-        level: "WARNING",
-        createdAt: new Date(),
+  try {
+    const now = new Date();
+    items = await prisma.announcement.findMany({
+      where: {
+        isActive: true,
+        AND: [
+          { OR: [{ startsAt: null }, { startsAt: { lte: now } }] },
+          { OR: [{ endsAt: null }, { endsAt: { gte: now } }] },
+        ],
       },
-    ];
-  } else {
-    try {
-      const { prisma } = await import("@/lib/prisma");
-      const now = new Date();
-      items = await prisma.announcement.findMany({
-        where: {
-          isActive: true,
-          AND: [
-            { OR: [{ startsAt: null }, { startsAt: { lte: now } }] },
-            { OR: [{ endsAt: null }, { endsAt: { gte: now } }] },
-          ],
-        },
-        orderBy: { createdAt: "desc" },
-        take: 3,
-      });
-    } catch {
-      // sessiz
-    }
+      orderBy: { createdAt: "desc" },
+      take: 3,
+    });
+  } catch {
+    // sessiz
   }
 
   if (items.length === 0) return null;
@@ -51,7 +37,7 @@ export async function SidebarAnnouncements() {
           <div
             key={a.id}
             className={cn(
-              "rounded-2xl p-4 text-sm shadow-sm border",
+              "rounded-2xl p-4 text-sm shadow-xs border",
               a.level === "INFO"
                 ? "bg-blue-50/50 border-blue-100/50 dark:bg-blue-950/20 dark:border-blue-900/30"
                 : a.level === "WARNING"
