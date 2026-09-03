@@ -1,0 +1,446 @@
+// HalkTV Teknik Destek — Prisma şeması
+// Sadece iletişim ve ticket/hata çözme odaklı.
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ============================================================
+// ENUMS
+// ============================================================
+enum Role {
+  SUPER_ADMIN
+  IT_MANAGER
+  IT_LEAD
+  IT_AGENT
+  EMPLOYEE
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  WAITING_REQUESTER
+  RESOLVED
+  CLOSED
+  CANCELLED
+}
+
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum TicketSource {
+  PORTAL
+  EMAIL
+  PHONE
+  SYSTEM
+}
+
+enum TicketCategory {
+  HARDWARE
+  SOFTWARE
+  ACCOUNT_ACCESS
+  NETWORK
+  EMAIL
+  OTHER
+}
+
+enum CommentVisibility {
+  PUBLIC
+  INTERNAL
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum AnnouncementLevel {
+  INFO
+  WARNING
+  OUTAGE
+}
+
+enum WebhookType {
+  TEAMS
+  SLACK
+}
+
+enum NotificationType {
+  TICKET_CREATED
+  TICKET_ASSIGNED
+  TICKET_STATUS
+  TICKET_COMMENT
+  SLA_WARNING
+  APPROVAL_REQUEST
+  ANNOUNCEMENT
+  DIRECT_MESSAGE
+}
+
+// ============================================================
+// AUTH.JS
+// ============================================================
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ============================================================
+// CORE — Personel
+// ============================================================
+model User {
+  id            String     @id @default(cuid())
+  email         String     @unique
+  name          String?
+  image         String?
+  emailVerified DateTime?
+  role          Role       @default(EMPLOYEE)
+  status        UserStatus @default(ACTIVE)
+  title         String?
+  phone         String?
+  employeeNo    String?    @unique
+  username      String?    @unique
+  passwordHash  String?
+
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id])
+  computers    Computer[]
+  notes        String?     @db.Text
+
+  managerId String?
+  manager   User?   @relation("OrgChart", fields: [managerId], references: [id])
+  reports   User[]  @relation("OrgChart")
+
+  accounts Session[]
+  authAcc  Account[]
+
+  requestedTickets Ticket[]        @relation("Requester")
+  assignedTickets  Ticket[]        @relation("Assignee")
+  comments         TicketComment[]
+  uploads          Attachment[]
+  timeEntries      TimeEntry[]
+  auditLogs        AuditLog[]
+
+  notifications Notification[]
+  pushSubs      PushSubscription[]
+  notifPrefs    NotificationPreference[]
+  dmSent        DirectMessage[]          @relation("DMSent")
+  dmReceived    DirectMessage[]          @relation("DMReceived")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([role])
+  @@index([status])
+}
+
+// ============================================================
+// TICKETING
+// ============================================================
+model Ticket {
+  id           String         @id @default(cuid())
+  number       String         @unique
+  title        String
+  description  String         @db.Text
+  category     TicketCategory @default(OTHER)
+  priority     TicketPriority @default(MEDIUM)
+  status       TicketStatus   @default(OPEN)
+  source       TicketSource   @default(PORTAL)
+  departmentId String?
+  department   Department?    @relation(fields: [departmentId], references: [id])
+
+  requesterId String
+  requester   User    @relation("Requester", fields: [requesterId], references: [id])
+  assigneeId  String?
+  assignee    User?   @relation("Assignee", fields: [assigneeId], references: [id])
+
+  requestTypeId String?
+  requestType   RequestType? @relation(fields: [requestTypeId], references: [id])
+  formData      Json?
+
+  slaDueAt   DateTime?
+  resolvedAt DateTime?
+  closedAt   DateTime?
+
+  comments    TicketComment[]
+  attachments Attachment[]
+  approvals   Approval[]
+  survey      SatisfactionSurvey?
+  timeEntries TimeEntry[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([assigneeId])
+  @@index([requesterId])
+  @@index([priority])
+  @@index([createdAt])
+}
+
+model TicketComment {
+  id         String            @id @default(cuid())
+  ticketId   String
+  ticket     Ticket            @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  authorId   String
+  author     User              @relation(fields: [authorId], references: [id])
+  body       String            @db.Text
+  visibility CommentVisibility @default(PUBLIC)
+
+  attachments Attachment[]
+  createdAt   DateTime     @default(now())
+
+  @@index([ticketId])
+}
+
+model Attachment {
+  id         String         @id @default(cuid())
+  ticketId   String?
+  ticket     Ticket?        @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  commentId  String?
+  comment    TicketComment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  uploaderId String
+  uploader   User           @relation(fields: [uploaderId], references: [id])
+
+  fileName    String
+  storagePath String
+  mimeType    String
+  sizeBytes   Int
+  createdAt   DateTime @default(now())
+
+  @@index([ticketId])
+}
+
+model TimeEntry {
+  id        String   @id @default(cuid())
+  ticketId  String
+  ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  minutes   Int
+  note      String?
+  spentAt   DateTime @default(now())
+  createdAt DateTime @default(now())
+
+  @@index([ticketId])
+  @@index([userId])
+}
+
+model RequestType {
+  id               String         @id @default(cuid())
+  name             String         @unique
+  description      String?
+  category         TicketCategory @default(OTHER)
+  formSchema       Json?
+  requiresApproval Boolean        @default(false)
+  isActive         Boolean        @default(true)
+  tickets          Ticket[]
+}
+
+model Approval {
+  id         String         @id @default(cuid())
+  ticketId   String
+  ticket     Ticket         @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  approverId String
+  status     ApprovalStatus @default(PENDING)
+  note       String?
+  decidedAt  DateTime?
+  createdAt  DateTime       @default(now())
+
+  @@index([ticketId])
+  @@index([approverId])
+}
+
+model SatisfactionSurvey {
+  id        String   @id @default(cuid())
+  ticketId  String   @unique
+  ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  rating    Int
+  comment   String?
+  createdAt DateTime @default(now())
+}
+
+// ============================================================
+// DUYURU / STATUS
+// ============================================================
+model Announcement {
+  id          String            @id @default(cuid())
+  title       String
+  body        String            @db.Text
+  level       AnnouncementLevel @default(INFO)
+  isActive    Boolean           @default(true)
+  startsAt    DateTime?
+  endsAt      DateTime?
+  createdById String
+  createdAt   DateTime          @default(now())
+
+  @@index([isActive])
+}
+
+model IntegrationWebhook {
+  id        String             @id @default(cuid())
+  name      String
+  type      WebhookType
+  url       String
+  events    NotificationType[]
+  isActive  Boolean            @default(true)
+  createdAt DateTime           @default(now())
+}
+
+// ============================================================
+// BİLDİRİMLER & MESAJLAR
+// ============================================================
+model Notification {
+  id         String           @id @default(cuid())
+  userId     String
+  user       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type       NotificationType
+  title      String
+  body       String?
+  link       String?
+  entityType String?
+  entityId   String?
+  isRead     Boolean          @default(false)
+  readAt     DateTime?
+  createdAt  DateTime         @default(now())
+
+  @@index([userId, isRead])
+  @@index([createdAt])
+}
+
+model NotificationPreference {
+  id           String           @id @default(cuid())
+  userId       String
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type         NotificationType
+  emailEnabled Boolean          @default(true)
+  pushEnabled  Boolean          @default(true)
+
+  @@unique([userId, type])
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+}
+
+model DirectMessage {
+  id          String    @id @default(cuid())
+  senderId    String
+  sender      User      @relation("DMSent", fields: [senderId], references: [id], onDelete: Cascade)
+  recipientId String
+  recipient   User      @relation("DMReceived", fields: [recipientId], references: [id], onDelete: Cascade)
+  body        String    @db.Text
+  isRead      Boolean   @default(false)
+  readAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([senderId, recipientId])
+  @@index([recipientId, isRead])
+  @@index([createdAt])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  actor      User?    @relation(fields: [actorId], references: [id])
+  action     String
+  entityType String
+  entityId   String
+  metadata   Json?
+  ip         String?
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([createdAt])
+}
+
+// ============================================================
+// KNOWLEDGE BASE (SSS)
+// ============================================================
+model KnowledgeArticle {
+  id          String         @id @default(cuid())
+  title       String
+  content     String         @db.Text
+  category    TicketCategory @default(OTHER)
+  isPublished Boolean        @default(true)
+  authorId    String
+  viewCount   Int            @default(0)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@index([category])
+}
+
+model Department {
+  id        String     @id @default(cuid())
+  name      String     @unique
+  users     User[]
+  tickets   Ticket[]
+  computers Computer[]
+  createdAt DateTime   @default(now())
+}
+
+model Computer {
+  id           String      @id @default(cuid())
+  name         String      @unique
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  userId       String?
+  user         User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  notes        String?     @db.Text
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @default(now()) @updatedAt
+}
+
