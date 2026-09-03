@@ -7,12 +7,26 @@ import { Topbar } from "@/components/app-shell/topbar";
 import { DepartmentPickerModal } from "@/components/app-shell/department-picker";
 import { requireUser } from "@/lib/auth-helpers";
 
+import { prisma } from "@/lib/prisma";
+
 export default async function AppLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   const user = await requireUser();
+
+  let departments: { id: string; name: string }[] = [];
+  if (!user.department && user.role === "EMPLOYEE") {
+    try {
+      departments = await prisma.department.findMany({
+        select: { id: true, name: true },
+        orderBy: { name: "asc" },
+      });
+    } catch {
+      departments = [];
+    }
+  }
 
   return (
     <div className="flex min-h-dvh">
@@ -34,9 +48,9 @@ export default async function AppLayout({
 
       <LiveChat />
       
-      {/* Departman seçimi (Sadece departmanı olmayan çalışanlar için) */}
+      {/* Departman seçimi (Sadece departmanı olmayan çalışanlar için onboarding modal) */}
       {!user.department && user.role === "EMPLOYEE" && (
-        <DepartmentPickerModal />
+        <DepartmentPickerModal departments={departments} />
       )}
     </div>
   );

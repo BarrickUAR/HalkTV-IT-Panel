@@ -1,12 +1,23 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { HiOutlineArrowLeft } from "react-icons/hi2";
+import { prisma } from "@/lib/prisma";
 
 import { NewTicketForm } from "./new-ticket-form";
 
 export const metadata: Metadata = { title: "Yeni Talep" };
 
-export default function NewTicketPage() {
+export default async function NewTicketPage() {
+  let departments: { id: string; name: string }[] = [];
+  try {
+    departments = await prisma.department.findMany({
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    });
+  } catch {
+    departments = [];
+  }
+
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
@@ -22,7 +33,7 @@ export default function NewTicketPage() {
         </p>
       </div>
       <div className="rounded-xl border bg-card p-6">
-        <NewTicketForm />
+        <NewTicketForm departments={departments} />
       </div>
     </div>
   );

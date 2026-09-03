@@ -32,8 +32,25 @@ function SubmitButton() {
   );
 }
 
-export function NewTicketForm() {
+export function NewTicketForm({
+  departments = [],
+}: {
+  departments?: { id: string; name: string }[];
+}) {
   const [state, action] = useActionState(createTicket, undefined);
+
+  const deptList =
+    departments.length > 0
+      ? departments
+      : [
+          { id: "haber", name: "Haber Merkezi" },
+          { id: "reji", name: "Reji & Yayın" },
+          { id: "kurgu", name: "Kurgu & Montaj" },
+          { id: "teknik", name: "Teknik Servis & IT" },
+          { id: "muhasebe", name: "Muhasebe & Finans" },
+          { id: "ik", name: "İnsan Kaynakları" },
+          { id: "yonetim", name: "Yönetim" },
+        ];
 
   return (
     <form action={action} className="space-y-5">
@@ -43,23 +60,23 @@ export function NewTicketForm() {
           id="title"
           name="title"
           required
-          placeholder="Kısa özet — ör. Yazıcı çalışmıyor"
+          placeholder="Sorunu kısaca özetle"
           className="h-11"
         />
       </div>
 
-      <div className="grid gap-5 sm:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="category">Kategori</Label>
           <select
             id="category"
             name="category"
-            defaultValue="OTHER"
+            defaultValue="HARDWARE"
             className={fieldClass}
           >
-            {CATEGORIES.map((c) => (
-              <option key={c} value={c}>
-                {CATEGORY_LABELS[c]}
+            {CATEGORIES.map((cat) => (
+              <option key={cat} value={cat}>
+                {CATEGORY_LABELS[cat]}
               </option>
             ))}
           </select>
@@ -91,14 +108,11 @@ export function NewTicketForm() {
           required
         >
           <option value="" disabled>Lütfen bulunduğunuz yeri seçin</option>
-          <option value="Haber Merkezi">Haber Merkezi</option>
-          <option value="Editör Katı">Editör Katı</option>
-          <option value="Reji">Reji</option>
-          <option value="Teknik">Teknik</option>
-          <option value="Prodüksiyon">Prodüksiyon</option>
-          <option value="İnsan Kaynakları">İnsan Kaynakları</option>
-          <option value="Muhasebe">Muhasebe</option>
-          <option value="Yönetim">Yönetim</option>
+          {deptList.map((d) => (
+            <option key={d.id} value={d.name}>
+              {d.name}
+            </option>
+          ))}
           <option value="Diğer (Açıklamada belirtin)">Diğer (Açıklamada belirtin)</option>
         </select>
       </div>
