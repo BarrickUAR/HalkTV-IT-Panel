@@ -138,7 +138,17 @@ export async function updateTicketStatus(
       resolvedAt: status === "RESOLVED" ? new Date() : undefined,
       closedAt: status === "CLOSED" ? new Date() : undefined,
     },
-    select: { title: true, requesterId: true },
+    select: { title: true, requesterId: true, number: true },
+  });
+
+  await prisma.auditLog.create({
+    data: {
+      actorId: user.id,
+      action: "STATUS_CHANGED",
+      entityType: "Ticket",
+      entityId: ticketId,
+      metadata: { newStatus: status },
+    }
   });
 
   if (ticket.requesterId !== user.id) {
@@ -174,6 +184,16 @@ export async function assignTicket(
         ? { status: "IN_PROGRESS" }
         : {}),
     },
+  });
+
+  await prisma.auditLog.create({
+    data: {
+      actorId: user.id,
+      action: "ASSIGNED",
+      entityType: "Ticket",
+      entityId: ticketId,
+      metadata: { newAssigneeId: assigneeId },
+    }
   });
 
   if (assigneeId && assigneeId !== user.id) {

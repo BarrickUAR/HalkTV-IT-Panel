@@ -105,20 +105,20 @@ export async function fetchContacts(
           if (sent.createdAt > rec.createdAt) {
              lastMsg = sent.body;
              lastMsgAt = sent.createdAt.toISOString();
-             isArchived = sent.archivedByRecipient;
+             isArchived = sent.archivedByRecipient ?? false;
           } else {
              lastMsg = "Sen: " + rec.body;
              lastMsgAt = rec.createdAt.toISOString();
-             isArchived = rec.archivedBySender;
+             isArchived = rec.archivedBySender ?? false;
           }
         } else if (sent) {
           lastMsg = sent.body;
           lastMsgAt = sent.createdAt.toISOString();
-          isArchived = sent.archivedByRecipient;
+          isArchived = sent.archivedByRecipient ?? false;
         } else if (rec) {
           lastMsg = "Sen: " + rec.body;
           lastMsgAt = rec.createdAt.toISOString();
-          isArchived = rec.archivedBySender;
+          isArchived = rec.archivedBySender ?? false;
         }
 
         return {
@@ -155,7 +155,8 @@ export async function fetchContacts(
       });
 
     return { contacts, totalUnread };
-  } catch {
+  } catch (err) {
+    console.error("fetchContacts error:", err);
     return { contacts: [], totalUnread: 0 };
   }
 }

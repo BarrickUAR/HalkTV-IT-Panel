@@ -70,6 +70,15 @@ export async function createTicket(
     },
   });
 
+  await prisma.auditLog.create({
+    data: {
+      actorId: user.id,
+      action: "CREATED",
+      entityType: "Ticket",
+      entityId: ticket.id,
+    }
+  });
+
   const attachment = formData.get("attachment") as File | null;
   if (attachment && attachment.size > 0) {
     const res = await saveUpload(attachment, "tickets");
