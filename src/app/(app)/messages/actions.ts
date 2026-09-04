@@ -31,6 +31,7 @@ export type Contact = {
   isMe: boolean;
   lastMessage?: string;
   lastMessageAt?: string;
+  isArchived?: boolean;
 };
 
 export async function fetchContacts(
@@ -63,16 +64,16 @@ export async function fetchContacts(
           lastActiveAt: true,
           department: { select: { name: true } },
           dmSent: {
-            where: { recipientId: me.id },
+            where: { recipientId: me.id, deletedByRecipient: false }, // Karşı taraf bana attı (ben recipient'ım), o yüzden deletedByRecipient
             orderBy: { createdAt: 'desc' },
             take: 1,
-            select: { body: true, createdAt: true }
+            select: { body: true, createdAt: true, archivedByRecipient: true }
           },
           dmReceived: {
-            where: { senderId: me.id },
+            where: { senderId: me.id, deletedBySender: false }, // Ben karşı tarafa attım (ben sender'ım), o yüzden deletedBySender
             orderBy: { createdAt: 'desc' },
             take: 1,
-            select: { body: true, createdAt: true }
+            select: { body: true, createdAt: true, archivedBySender: true }
           }
         },
         orderBy: { name: "asc" },
@@ -96,6 +97,7 @@ export async function fetchContacts(
         
         let lastMsg = null;
         let lastMsgAt = null;
+        let isArchived = false;
         const sent = u.dmSent[0];
         const rec = u.dmReceived[0];
         
@@ -103,16 +105,20 @@ export async function fetchContacts(
           if (sent.createdAt > rec.createdAt) {
              lastMsg = sent.body;
              lastMsgAt = sent.createdAt.toISOString();
+             isArchived = sent.archivedByRecipient;
           } else {
              lastMsg = "Sen: " + rec.body;
              lastMsgAt = rec.createdAt.toISOString();
+             isArchived = rec.archivedBySender;
           }
         } else if (sent) {
           lastMsg = sent.body;
           lastMsgAt = sent.createdAt.toISOString();
+          isArchived = sent.archivedByRecipient;
         } else if (rec) {
           lastMsg = "Sen: " + rec.body;
           lastMsgAt = rec.createdAt.toISOString();
+          isArchived = rec.archivedBySender;
         }
 
         return {
@@ -127,6 +133,7 @@ export async function fetchContacts(
           isMe: u.id === me.id,
           lastMessage: lastMsg || undefined,
           lastMessageAt: lastMsgAt || undefined,
+          isArchived,
         };
       })
       .sort((a, b) => {
@@ -177,8 +184,8 @@ export async function fetchThread(otherId: string): Promise<MessageDTO[]> {
     const rows = await prisma.directMessage.findMany({
       where: {
         OR: [
-          { senderId: me.id, recipientId: otherId },
-          { senderId: otherId, recipientId: me.id },
+          { senderId: me.id, recipientId: otherId, deletedBySender: false },
+          { senderId: otherId, recipientId: me.id, deletedByRecipient: false },
         ],
       },
       orderBy: { createdAt: "asc" },
@@ -286,6 +293,60 @@ export async function deleteMessage(messageId: string): Promise<{ ok: boolean }>
 
     await prisma.directMessage.delete({ where: { id: messageId } });
     revalidatePath(`/messages/${msg.recipientId}`);
+    return { ok: true };
+  } catch {
+    return { ok: false };
+  }
+}
+
+/** Sohbet arşivle — kullanıcının tüm mesajlarını arşive taşır */
+export async function archiveConversation(otherId: string): Promise<{ ok: boolean }> {
+  try {
+    const me = await requireUser();
+    await prisma.directMessage.updateMany({
+      where: { senderId: me.id, recipientId: otherId },
+      data: { archivedBySender: true },
+    });
+    await prisma.directMessage.updateMany({
+      where: { senderId: otherId, recipientId: me.id },
+      data: { archivedByRecipient: true },
+    });
+    return { ok: true };
+  } catch {
+    return { ok: false };
+  }
+}
+
+/** Sohbet arşivden çıkar */
+export async function unarchiveConversation(otherId: string): Promise<{ ok: boolean }> {
+  try {
+    const me = await requireUser();
+    await prisma.directMessage.updateMany({
+      where: { senderId: me.id, recipientId: otherId },
+      data: { archivedBySender: false },
+    });
+    await prisma.directMessage.updateMany({
+      where: { senderId: otherId, recipientId: me.id },
+      data: { archivedByRecipient: false },
+    });
+    return { ok: true };
+  } catch {
+    return { ok: false };
+  }
+}
+
+/** Sohbeti sil — kullanıcının tüm mesajlarını siler */
+export async function deleteConversation(otherId: string): Promise<{ ok: boolean }> {
+  try {
+    const me = await requireUser();
+    await prisma.directMessage.updateMany({
+      where: { senderId: me.id, recipientId: otherId },
+      data: { deletedBySender: true },
+    });
+    await prisma.directMessage.updateMany({
+      where: { senderId: otherId, recipientId: me.id },
+      data: { deletedByRecipient: true },
+    });
     return { ok: true };
   } catch {
     return { ok: false };

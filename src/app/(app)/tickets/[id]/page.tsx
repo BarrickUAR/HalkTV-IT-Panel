@@ -10,6 +10,7 @@ import { isITStaff } from "@/lib/rbac/permissions";
 import { cn } from "@/lib/utils";
 import { TicketHistory } from "./ticket-history";
 import { MergeTicketButton } from "./merge-ticket-button";
+import { TicketActionButtons } from "./ticket-action-buttons";
 import {
   CATEGORY_LABELS,
   PRIORITY_BADGE,
@@ -83,16 +84,27 @@ export default async function TicketDetailPage({
     },
   });
 
-  const agents = it
-    ? await prisma.user.findMany({
-        where: {
-          role: { in: ["IT_AGENT", "TEKNIK_YONETMEN", "TEKNIK_MUDUR", "SUPER_ADMIN"] },
-          status: "ACTIVE",
-        },
-        select: { id: true, name: true, email: true },
-        orderBy: { name: "asc" },
-      })
-    : [];
+  const [agents, mergeableTickets] = await (it
+    ? Promise.all([
+        prisma.user.findMany({
+          where: {
+            role: { in: ["IT_AGENT", "TEKNIK_YONETMEN", "TEKNIK_MUDUR", "SUPER_ADMIN"] },
+            status: "ACTIVE",
+          },
+          select: { id: true, name: true, email: true },
+          orderBy: { name: "asc" },
+        }),
+        prisma.ticket.findMany({
+          where: {
+            deletedAt: null,
+            status: { notIn: ["CLOSED", "CANCELLED"] },
+          },
+          select: { id: true, number: true, title: true },
+          orderBy: { createdAt: "desc" },
+          take: 200,
+        }),
+      ])
+    : Promise.resolve([[], []]));
 
   if (!ticket || (!it && ticket.requesterId !== user.id)) notFound();
 
@@ -129,8 +141,9 @@ export default async function TicketDetailPage({
           </h1>
         </div>
         {it && (
-          <div className="shrink-0 mt-1">
-            <MergeTicketButton ticketId={ticket.id} ticketNumber={ticket.number} />
+          <div className="shrink-0 mt-1 flex items-center gap-2">
+            <MergeTicketButton ticketId={ticket.id} ticketNumber={ticket.number} tickets={mergeableTickets as any} />
+            <TicketActionButtons ticketId={ticket.id} isArchived={!!ticket.archivedAt} />
           </div>
         )}
       </div>

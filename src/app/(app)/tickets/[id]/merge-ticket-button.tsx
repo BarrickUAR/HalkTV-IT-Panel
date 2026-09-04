@@ -1,37 +1,47 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { HiOutlineArrowsPointingIn, HiOutlineXMark } from "react-icons/hi2";
+import { HiOutlineArrowsPointingIn, HiOutlineXMark, HiOutlineMagnifyingGlass } from "react-icons/hi2";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { mergeTicket } from "./actions";
 
-export function MergeTicketButton({ ticketId, ticketNumber }: { ticketId: string; ticketNumber: string }) {
+type TicketOption = { id: string; number: string; title: string };
+
+export function MergeTicketButton({
+  ticketId,
+  ticketNumber,
+  tickets,
+}: {
+  ticketId: string;
+  ticketNumber: string;
+  tickets: TicketOption[];
+}) {
   const [open, setOpen] = useState(false);
-  const [targetNumber, setTargetNumber] = useState("");
+  const [search, setSearch] = useState("");
+  const [selected, setSelected] = useState<TicketOption | null>(null);
   const [pending, startTransition] = useTransition();
 
+  const filtered = tickets
+    .filter((t) => t.id !== ticketId)
+    .filter(
+      (t) =>
+        t.number.toLowerCase().includes(search.toLowerCase()) ||
+        t.title.toLowerCase().includes(search.toLowerCase()),
+    );
+
   function handleMerge() {
-    const trimmed = targetNumber.trim().replace(/^#/, "").toUpperCase();
-    if (!trimmed) {
-      toast.error("Lütfen hedef talep numarasını girin.");
+    if (!selected) {
+      toast.error("Lütfen bir talep seçin.");
       return;
     }
-
     startTransition(async () => {
-      // Önce talep numarasından ID bul
-      const res = await fetch(`/api/tickets/find-by-number?number=${encodeURIComponent(trimmed)}`);
-      if (!res.ok) {
-        toast.error("Talep bulunamadı. Numarayı kontrol edin.");
-        return;
-      }
-      const { id: targetId } = await res.json();
-
-      const result = await mergeTicket(ticketId, targetId);
+      const result = await mergeTicket(ticketId, selected.id);
       if (result.ok) {
-        toast.success("Talepler başarıyla birleştirildi!");
+        toast.success(`${ticketNumber} numaralı talep ${selected.number} ile birleştirildi.`);
         setOpen(false);
-        setTargetNumber("");
+        setSelected(null);
+        setSearch("");
       } else {
         toast.error(result.error ?? "Bir hata oluştu.");
       }
@@ -40,48 +50,86 @@ export function MergeTicketButton({ ticketId, ticketNumber }: { ticketId: string
 
   return (
     <>
-      <Button variant="outline" size="sm" className="gap-2 text-muted-foreground" onClick={() => setOpen(true)}>
+      <Button
+        variant="outline"
+        size="sm"
+        className="gap-2 text-muted-foreground"
+        onClick={() => setOpen(true)}
+      >
         <HiOutlineArrowsPointingIn className="size-4" />
         Birleştir
       </Button>
 
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="relative w-96 rounded-2xl border bg-card p-6 shadow-xl">
-            <button
-              onClick={() => setOpen(false)}
-              className="absolute right-3 top-3 p-1 rounded-lg hover:bg-muted text-muted-foreground"
-            >
-              <HiOutlineXMark className="size-5" />
-            </button>
-            <h3 className="text-base font-semibold mb-1">Talep Birleştir</h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              <strong>{ticketNumber}</strong> numaralı talep, girdiğiniz talebe birleştirilecek ve kapatılacaktır.
-            </p>
-
-            <div className="space-y-3">
+          <div className="relative w-[480px] max-h-[90vh] flex flex-col rounded-2xl border bg-card shadow-xl">
+            {/* Header */}
+            <div className="flex items-center justify-between p-5 border-b">
               <div>
-                <label className="text-xs font-medium text-muted-foreground mb-1 block">
-                  Hedef Talep Numarası
-                </label>
+                <h3 className="text-base font-semibold">Talep Birleştir</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  <strong>{ticketNumber}</strong> seçilen taleple birleştirilecek ve kapatılacak.
+                </p>
+              </div>
+              <button
+                onClick={() => { setOpen(false); setSelected(null); setSearch(""); }}
+                className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground"
+              >
+                <HiOutlineXMark className="size-5" />
+              </button>
+            </div>
+
+            {/* Search */}
+            <div className="p-4 border-b">
+              <div className="flex items-center gap-2 rounded-xl border bg-background px-3 focus-within:ring-2 focus-within:ring-primary/50">
+                <HiOutlineMagnifyingGlass className="size-4 text-muted-foreground shrink-0" />
                 <input
-                  value={targetNumber}
-                  onChange={(e) => setTargetNumber(e.target.value)}
-                  placeholder="Örn: HTK-0042"
-                  className="w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/50"
-                  onKeyDown={(e) => e.key === "Enter" && handleMerge()}
+                  autoFocus
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Talep numarası veya başlık ara..."
+                  className="h-10 w-full bg-transparent text-sm outline-none"
                 />
               </div>
+            </div>
 
-              <div className="flex gap-2 pt-1">
-                <Button variant="outline" className="flex-1" onClick={() => setOpen(false)}>
-                  Vazgeç
-                </Button>
-                <Button className="flex-1 gap-2" onClick={handleMerge} disabled={pending}>
-                  <HiOutlineArrowsPointingIn className="size-4" />
-                  {pending ? "Birleştiriliyor..." : "Birleştir"}
-                </Button>
-              </div>
+            {/* Ticket List */}
+            <div className="flex-1 overflow-y-auto p-2 min-h-0">
+              {filtered.length === 0 ? (
+                <p className="p-6 text-center text-sm text-muted-foreground">Talep bulunamadı.</p>
+              ) : (
+                filtered.map((t) => (
+                  <button
+                    key={t.id}
+                    onClick={() => setSelected(t)}
+                    className={`w-full text-left rounded-xl p-3 transition-colors ${
+                      selected?.id === t.id
+                        ? "bg-primary/10 border border-primary/30"
+                        : "hover:bg-muted border border-transparent"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-xs text-primary/80 shrink-0">{t.number}</span>
+                      <span className="text-sm font-medium truncate">{t.title}</span>
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="flex gap-2 p-4 border-t">
+              <Button variant="outline" className="flex-1" onClick={() => { setOpen(false); setSelected(null); setSearch(""); }}>
+                Vazgeç
+              </Button>
+              <Button
+                className="flex-1 gap-2"
+                onClick={handleMerge}
+                disabled={pending || !selected}
+              >
+                <HiOutlineArrowsPointingIn className="size-4" />
+                {pending ? "Birleştiriliyor..." : `Birleştir${selected ? ` → ${selected.number}` : ""}`}
+              </Button>
             </div>
           </div>
         </div>

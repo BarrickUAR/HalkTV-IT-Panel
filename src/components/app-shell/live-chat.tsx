@@ -14,6 +14,7 @@ import {
   HiOutlineCheck,
   HiOutlineClock,
   HiOutlineArrowDownTray,
+  HiOutlineArchiveBox,
 } from "react-icons/hi2";
 import { toast } from "sonner";
 
@@ -25,6 +26,9 @@ import {
   sendMessage,
   deleteMessage,
   unreadMessageCount,
+  archiveConversation,
+  unarchiveConversation,
+  deleteConversation,
   type Contact,
   type MessageDTO,
 } from "@/app/(app)/messages/actions";
@@ -49,7 +53,7 @@ function formatBytes(bytes: number): string {
 
 export function LiveChat() {
   const [open, setOpen] = useState(false);
-  const [tab, setTab] = useState<"support" | "chat">("support");
+  const [tab, setTab] = useState<"support" | "chat" | "archived">("support");
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [q, setQ] = useState("");
   const [active, setActive] = useState<Contact | null>(null);
@@ -369,11 +373,35 @@ export function LiveChat() {
                <button
                  type="button"
                  onClick={() => {
+                   const isArchived = active.isArchived;
+                   startSend(async () => {
+                     const ok = isArchived 
+                       ? await unarchiveConversation(active.id) 
+                       : await archiveConversation(active.id);
+                     if (ok.ok) {
+                        toast.success(isArchived ? "Sohbet arşivden çıkarıldı." : "Sohbet arşivlendi.");
+                        // Listeyi yenilemek için
+                        const r = await fetchContacts(q);
+                        setContacts(r.contacts);
+                     }
+                   });
+                 }}
+                 title={active.isArchived ? "Arşivden Çıkar" : "Arşive Taşı"}
+                 className="rounded-full p-2 transition-colors hover:bg-white/20 text-white/80 hover:text-white"
+               >
+                 <HiOutlineArchiveBox className="size-5" />
+               </button>
+               <button
+                 type="button"
+                 onClick={() => {
                    if (confirm("Bu kişiyle olan tüm konuşma geçmişini (senin ekranından) silmek istediğine emin misin?")) {
-                     const ids = thread.map(t => t.id).filter(id => !id.startsWith("tmp-"));
                      setThread([]);
-                     startSend(() => {
-                       ids.forEach(id => deleteMessage(id));
+                     startSend(async () => {
+                       const ok = await deleteConversation(active.id);
+                       if (ok.ok) {
+                         const r = await fetchContacts(q);
+                         setContacts(r.contacts);
+                       }
                      });
                    }
                  }}
@@ -406,7 +434,16 @@ export function LiveChat() {
                     tab === "chat" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
                   )}
                 >
-                  Sohbet (Personel)
+                  Sohbet
+                </button>
+                <button
+                  onClick={() => setTab("archived")}
+                  className={cn(
+                    "flex-1 pb-2 text-sm font-semibold transition-colors border-b-2",
+                    tab === "archived" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  Arşiv
                 </button>
               </div>
               <div className="p-3">
@@ -431,10 +468,11 @@ export function LiveChat() {
               ) : (
                 (() => {
                   const itRoles = ["SUPER_ADMIN", "TEKNIK_MUDUR", "TEKNIK_YONETMEN", "IT_AGENT"];
-                  const itContacts = contacts.filter(c => itRoles.includes(c.role || "") && !c.isMe);
-                  const otherContacts = contacts.filter(c => !itRoles.includes(c.role || "") && !c.isMe);
+                  const itContacts = contacts.filter(c => !c.isArchived && itRoles.includes(c.role || "") && !c.isMe);
+                  const otherContacts = contacts.filter(c => !c.isArchived && !itRoles.includes(c.role || "") && !c.isMe);
+                  const archivedContacts = contacts.filter(c => c.isArchived && !c.isMe);
                   
-                  const visibleContacts = (tab === "support" ? itContacts : otherContacts).sort((a, b) => {
+                  const visibleContacts = (tab === "support" ? itContacts : tab === "chat" ? otherContacts : archivedContacts).sort((a, b) => {
                     // 1. Okunmamış olanlar en üstte
                     if (a.unread > 0 && b.unread === 0) return -1;
                     if (b.unread > 0 && a.unread === 0) return 1;

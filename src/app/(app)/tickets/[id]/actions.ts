@@ -287,3 +287,46 @@ export async function mergeTicket(
   revalidatePath(`/tickets/${sourceId}`);
   return { ok: true };
 }
+
+/** Ticket arşivle — IT personeli için */
+export async function archiveTicket(ticketId: string): Promise<{ ok: boolean; error?: string }> {
+  const user = await requireUser();
+  if (!isITStaff(user.role)) return { ok: false, error: "Yetkin yok." };
+
+  await prisma.ticket.update({
+    where: { id: ticketId },
+    data: { archivedAt: new Date() },
+  });
+
+  revalidatePath("/tickets");
+  return { ok: true };
+}
+
+/** Ticket arşivden çıkar */
+export async function unarchiveTicket(ticketId: string): Promise<{ ok: boolean; error?: string }> {
+  const user = await requireUser();
+  if (!isITStaff(user.role)) return { ok: false, error: "Yetkin yok." };
+
+  await prisma.ticket.update({
+    where: { id: ticketId },
+    data: { archivedAt: null },
+  });
+
+  revalidatePath("/tickets");
+  return { ok: true };
+}
+
+/** Ticket sil (soft delete) — IT personeli için */
+export async function deleteTicket(ticketId: string): Promise<{ ok: boolean; error?: string }> {
+  const user = await requireUser();
+  if (!isITStaff(user.role)) return { ok: false, error: "Yetkin yok." };
+
+  await prisma.ticket.update({
+    where: { id: ticketId },
+    data: { deletedAt: new Date() },
+  });
+
+  revalidatePath("/tickets");
+  revalidatePath(`/tickets/${ticketId}`);
+  return { ok: true };
+}
