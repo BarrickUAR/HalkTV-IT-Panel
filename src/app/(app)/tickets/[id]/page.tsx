@@ -9,6 +9,7 @@ import { prisma } from "@/lib/prisma";
 import { isITStaff } from "@/lib/rbac/permissions";
 import { cn } from "@/lib/utils";
 import { TicketHistory } from "./ticket-history";
+import { MergeTicketButton } from "./merge-ticket-button";
 import {
   CATEGORY_LABELS,
   PRIORITY_BADGE,
@@ -118,13 +119,20 @@ export default async function TicketDetailPage({
         <HiOutlineArrowLeft className="size-4" /> Talepler
       </Link>
 
-      <div className="mt-4 mb-6">
-        <p className="font-mono text-xs text-muted-foreground">
-          {ticket.number}
-        </p>
-        <h1 className="mt-1 text-2xl font-bold tracking-tight">
-          {ticket.title}
-        </h1>
+      <div className="mt-4 mb-6 flex items-start justify-between gap-4">
+        <div>
+          <p className="font-mono text-xs text-muted-foreground">
+            {ticket.number}
+          </p>
+          <h1 className="mt-1 text-2xl font-bold tracking-tight">
+            {ticket.title}
+          </h1>
+        </div>
+        {it && (
+          <div className="shrink-0 mt-1">
+            <MergeTicketButton ticketId={ticket.id} ticketNumber={ticket.number} />
+          </div>
+        )}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">

@@ -238,3 +238,52 @@ export async function logTime(
   revalidatePath(`/tickets/${ticketId}`);
   return { ok: true };
 }
+
+/** Ticket birleştirme — IT personeli için */
+export async function mergeTicket(
+  sourceId: string,
+  targetId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const user = await requireUser();
+  if (!isITStaff(user.role)) return { ok: false, error: "Yetkin yok." };
+  if (sourceId === targetId) return { ok: false, error: "Aynı talep seçildi." };
+
+  const [source, target] = await Promise.all([
+    prisma.ticket.findUnique({ where: { id: sourceId }, select: { id: true, number: true, status: true } }),
+    prisma.ticket.findUnique({ where: { id: targetId }, select: { id: true, number: true } }),
+  ]);
+
+  if (!source || !target) return { ok: false, error: "Talep bulunamadı." };
+  if (source.status === "CLOSED" || source.status === "CANCELLED") {
+    return { ok: false, error: "Kapalı talep birleştirilemez." };
+  }
+
+  await prisma.$transaction([
+    // Yorumları hedef talebe taşı
+    prisma.ticketComment.updateMany({
+      where: { ticketId: sourceId },
+      data: { ticketId: targetId },
+    }),
+    // Kaynak talebe birleştirme notu ekle
+    prisma.ticketComment.create({
+      data: {
+        ticketId: targetId,
+        authorId: user.id,
+        body: `🔀 Bu talep **${source.number}** numaralı taleple birleştirildi.`,
+        visibility: "PUBLIC",
+      },
+    }),
+    // Kaynak talebi kapat
+    prisma.ticket.update({
+      where: { id: sourceId },
+      data: {
+        status: "CLOSED",
+        closedAt: new Date(),
+      },
+    }),
+  ]);
+
+  revalidatePath(`/tickets/${targetId}`);
+  revalidatePath(`/tickets/${sourceId}`);
+  return { ok: true };
+}

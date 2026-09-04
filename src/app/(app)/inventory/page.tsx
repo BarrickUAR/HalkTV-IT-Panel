@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { isITStaff } from "@/lib/rbac/permissions";
 import { redirect } from "next/navigation";
 import { ComputerDialog } from "./computer-dialog";
+import { QRPrintButton } from "./qr-print-button";
 import { HiOutlineComputerDesktop, HiOutlineBuildingOffice2, HiOutlineUser } from "react-icons/hi2";
 
 export default async function InventoryPage() {
@@ -88,12 +89,19 @@ export default async function InventoryPage() {
                     {c.notes || "—"}
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <ComputerDialog
-                      computer={c}
-                      departments={departments}
-                      users={users}
-                      variant="ghost"
-                    />
+                    <div className="flex items-center justify-end gap-1">
+                      <QRPrintButton
+                        computerName={c.name}
+                        computerDepartment={c.department?.name}
+                        computerUser={c.user?.name ?? c.user?.email}
+                      />
+                      <ComputerDialog
+                        computer={c}
+                        departments={departments}
+                        users={users}
+                        variant="ghost"
+                      />
+                    </div>
                   </td>
                 </tr>
               ))

@@ -21,6 +21,8 @@ import {
   STATUS_LABELS,
 } from "@/lib/ticket-labels";
 
+import { PrintReportButton } from "./print-button";
+
 export const metadata: Metadata = { title: "Raporlar" };
 
 type Row = { label: string; count: number };
@@ -151,14 +153,17 @@ export default async function ReportsPage() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex items-center justify-between gap-4 print:hidden">
         <h1 className="text-2xl font-bold tracking-tight">Raporlar</h1>
-        <a
-          href="/api/reports/tickets.csv"
-          className={buttonVariants({ variant: "outline", size: "sm" })}
-        >
-          <HiOutlineArrowDownTray className="size-4" /> CSV indir
-        </a>
+        <div className="flex items-center gap-2">
+          <a
+            href="/api/reports/tickets.csv"
+            className={buttonVariants({ variant: "outline", size: "sm" })}
+          >
+            <HiOutlineArrowDownTray className="size-4" /> CSV İndir
+          </a>
+          <PrintReportButton />
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
