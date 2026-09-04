@@ -70,7 +70,7 @@ export function CommentThread({
       <div className="max-h-[28rem] space-y-4 overflow-y-auto p-5">
         {comments.length === 0 ? (
           <p className="py-8 text-center text-sm text-muted-foreground">
-            Henüz mesaj yok. İlk mesajı yaz.
+            Bu talep için henüz bir mesaj bulunmuyor. Eklemek istediğiniz bir detay varsa buradan iletebilirsiniz.
           </p>
         ) : (
           comments.map((c) => {

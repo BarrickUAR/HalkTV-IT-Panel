@@ -19,21 +19,21 @@ export function SurveyWidget({ ticketId }: { ticketId: string }) {
 
   function submit() {
     if (!rating) {
-      toast.error("Puan seç.");
+      toast.error("Lütfen bir değerlendirme puanı seçin.");
       return;
     }
     start(async () => {
       const r = await submitSurvey(ticketId, rating, comment);
       if (r.ok) {
-        toast.success("Değerlendirmen için teşekkürler!");
+        toast.success("Değerlendirmeniz için teşekkür ederiz!");
         router.refresh();
-      } else toast.error(r.error ?? "Olmadı.");
+      } else toast.error(r.error ?? "Değerlendirme gönderilirken bir hata oluştu.");
     });
   }
 
   return (
     <div className="rounded-xl border bg-card p-5">
-      <h3 className="text-sm font-semibold">Hizmeti değerlendir</h3>
+      <h3 className="text-sm font-semibold">Hizmetimizi Değerlendirin</h3>
       <div className="mt-3 flex gap-1">
         {[1, 2, 3, 4, 5].map((n) => (
           <button
@@ -60,11 +60,11 @@ export function SurveyWidget({ ticketId }: { ticketId: string }) {
         value={comment}
         onChange={(e) => setComment(e.target.value)}
         rows={2}
-        placeholder="Yorumun (opsiyonel)"
+        placeholder="Deneyiminizle ilgili eklemek istedikleriniz (İsteğe bağlı)"
         className="mt-3 w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
       />
       <Button size="sm" className="mt-3 h-9" disabled={pending} onClick={submit}>
-        Gönder
+        Değerlendirmeyi Gönder
       </Button>
     </div>
   );

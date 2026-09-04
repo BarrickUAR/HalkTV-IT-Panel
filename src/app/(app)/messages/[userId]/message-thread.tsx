@@ -57,7 +57,7 @@ export function MessageThread({
       <div className="max-h-[60vh] min-h-64 space-y-3 overflow-y-auto p-5">
         {messages.length === 0 ? (
           <p className="py-8 text-center text-sm text-muted-foreground">
-            Henüz mesaj yok. İlk mesajı yaz.
+            Burada henüz mesajlaşma başlatılmamış. İlk mesajı siz gönderebilirsiniz.
           </p>
         ) : (
           messages.map((m) => (

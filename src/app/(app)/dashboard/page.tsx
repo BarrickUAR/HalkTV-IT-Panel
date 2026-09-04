@@ -201,7 +201,7 @@ export default async function DashboardPage() {
             </Link>
           </div>
           {recent.length === 0 ? (
-            <p className="p-8 text-center text-sm text-muted-foreground">Henüz talep yok.</p>
+            <p className="p-8 text-center text-sm text-muted-foreground">Sistemde henüz işlem gören veya açılmış bir talep bulunmuyor.</p>
           ) : (
             <div className="divide-y">
               {recent.map((t) => (

@@ -50,9 +50,9 @@ export function TicketManage({
             start(async () => {
               const r = await updateTicketStatus(ticketId, v);
               if (r.ok) {
-                toast.success("Durum güncellendi.");
+                toast.success("Talep durumu başarıyla güncellendi.");
                 router.refresh();
-              } else toast.error("Güncellenemedi.");
+              } else toast.error("Durum güncellenirken bir sorun oluştu.");
             });
           }}
         >
@@ -77,9 +77,9 @@ export function TicketManage({
             start(async () => {
               const r = await assignTicket(ticketId, v);
               if (r.ok) {
-                toast.success("Atama güncellendi.");
+                toast.success("Talep ataması başarıyla güncellendi.");
                 router.refresh();
-              } else toast.error("Güncellenemedi.");
+              } else toast.error("Atama güncellenirken bir sorun oluştu.");
             });
           }}
         >
