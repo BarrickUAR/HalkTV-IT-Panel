@@ -94,8 +94,17 @@ export async function updateUserAction(
   const actor = await requireRole(["TEKNIK_YONETMEN", "TEKNIK_MUDUR", "SUPER_ADMIN"]);
   const parsed = updateSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: parsed.error.issues[0]?.message };
+  
+  const targetUser = await prisma.user.findUnique({ where: { id: parsed.data.id } });
+  if (!targetUser) return { error: "Kullanıcı bulunamadı." };
+
   if (!assignableRoles(actor.role).includes(parsed.data.role)) {
     return { error: "Bu rolü atama yetkin yok." };
+  }
+  
+  // Prevent editing a user who currently has a role you cannot assign
+  if (targetUser.id !== actor.id && !assignableRoles(actor.role).includes(targetUser.role)) {
+    return { error: "Bu kullanıcının mevcut yetkisi senin yetkinden yüksek olduğu için işlem yapamazsın." };
   }
   if (
     parsed.data.id === actor.id &&
@@ -126,10 +135,17 @@ export async function resetPasswordAction(
   _prev: UserFormState,
   formData: FormData,
 ): Promise<UserFormState> {
-  await requireRole(["TEKNIK_YONETMEN", "TEKNIK_MUDUR", "SUPER_ADMIN"]);
+  const actor = await requireRole(["TEKNIK_YONETMEN", "TEKNIK_MUDUR", "SUPER_ADMIN"]);
   const id = String(formData.get("id") ?? "");
   const password = String(formData.get("password") ?? "");
   if (password.length < 8) return { error: "Şifre en az 8 karakter olmalı." };
+
+  const targetUser = await prisma.user.findUnique({ where: { id } });
+  if (!targetUser) return { error: "Kullanıcı bulunamadı." };
+  
+  if (targetUser.id !== actor.id && !assignableRoles(actor.role).includes(targetUser.role)) {
+    return { error: "Bu kullanıcının yetkisi seninkinden yüksek, şifresini sıfırlayamazsın." };
+  }
 
   await prisma.user.update({
     where: { id },
