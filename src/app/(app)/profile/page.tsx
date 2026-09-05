@@ -6,6 +6,7 @@ import { ProfileForm } from "./profile-form";
 import { PasswordChangeForm } from "./password-change-form";
 import { IntegrationSection } from "./integration-section";
 import { PushSubscriptionButton } from "./push-subscription-button";
+import { MessagesSettings } from "./messages-settings";
 
 export const metadata: Metadata = { title: "Profilim" };
 
@@ -14,7 +15,7 @@ export default async function ProfilePage() {
 
   const canIntegrate = can(user.role, "integration:manage");
 
-  const [dbUser, departments, computers, webhooks] = await Promise.all([
+  const [dbUser, departments, computers, webhooks, blockedUsers] = await Promise.all([
     prisma.user.findUnique({
       where: { id: user.id },
       select: {
@@ -26,6 +27,7 @@ export default async function ProfilePage() {
         title: true,
         departmentId: true,
         phone: true,
+        directMessagesEnabled: true,
       },
     }),
     prisma.department.findMany({ orderBy: { name: "asc" } }),
@@ -36,6 +38,10 @@ export default async function ProfilePage() {
     canIntegrate
       ? prisma.integrationWebhook.findMany({ orderBy: { createdAt: "asc" } })
       : Promise.resolve([]),
+    prisma.userBlock.findMany({
+      where: { blockerId: user.id },
+      include: { blocked: { select: { id: true, name: true } } },
+    }),
   ]);
 
   if (!dbUser) return null;
@@ -52,6 +58,11 @@ export default async function ProfilePage() {
       <PushSubscriptionButton />
 
       <PasswordChangeForm />
+
+      <MessagesSettings 
+        initialEnabled={dbUser.directMessagesEnabled} 
+        blockedUsers={blockedUsers.map(b => ({ id: b.blocked.id, name: b.blocked.name || "İsimsiz" }))} 
+      />
 
       {canIntegrate ? <IntegrationSection webhooks={webhooks} /> : null}
     </div>

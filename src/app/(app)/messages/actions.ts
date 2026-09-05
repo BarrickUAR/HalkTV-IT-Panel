@@ -32,6 +32,8 @@ export type Contact = {
   lastMessage?: string;
   lastMessageAt?: string;
   isArchived?: boolean;
+  isBlocked?: boolean;
+  directMessagesEnabled?: boolean;
 };
 
 export async function fetchContacts(
@@ -41,7 +43,7 @@ export async function fetchContacts(
   const q = (query ?? "").trim().toLowerCase();
 
   try {
-    const [users, unread] = await Promise.all([
+    const [users, unread, blocks] = await Promise.all([
       prisma.user.findMany({
         where: {
           status: "ACTIVE",
@@ -62,15 +64,16 @@ export async function fetchContacts(
           role: true, 
           image: true,
           lastActiveAt: true,
+          directMessagesEnabled: true,
           department: { select: { name: true } },
           dmSent: {
-            where: { recipientId: me.id, deletedByRecipient: false }, // Karşı taraf bana attı (ben recipient'ım), o yüzden deletedByRecipient
+            where: { recipientId: me.id, deletedByRecipient: false },
             orderBy: { createdAt: 'desc' },
             take: 1,
             select: { body: true, createdAt: true, archivedByRecipient: true }
           },
           dmReceived: {
-            where: { senderId: me.id, deletedBySender: false }, // Ben karşı tarafa attım (ben sender'ım), o yüzden deletedBySender
+            where: { senderId: me.id, deletedBySender: false },
             orderBy: { createdAt: 'desc' },
             take: 1,
             select: { body: true, createdAt: true, archivedBySender: true }
@@ -84,16 +87,21 @@ export async function fetchContacts(
         where: { recipientId: me.id, isRead: false },
         _count: true,
       }),
+      prisma.userBlock.findMany({
+        where: { blockerId: me.id },
+        select: { blockedId: true }
+      })
     ]);
 
     const unreadMap = new Map(unread.map((u) => [u.senderId, u._count]));
     const totalUnread = unread.reduce((s, u) => s + u._count, 0);
+    const blockedSet = new Set(blocks.map(b => b.blockedId));
 
     const now = new Date();
     
     const contacts: Contact[] = users
       .map((u) => {
-        const isOnline = u.lastActiveAt ? (now.getTime() - u.lastActiveAt.getTime()) < 120000 : false; // 2 dakika içinde aktifse online
+        const isOnline = u.lastActiveAt ? (now.getTime() - u.lastActiveAt.getTime()) < 120000 : false;
         
         let lastMsg = null;
         let lastMsgAt = null;
@@ -134,23 +142,19 @@ export async function fetchContacts(
           lastMessage: lastMsg || undefined,
           lastMessageAt: lastMsgAt || undefined,
           isArchived,
+          isBlocked: blockedSet.has(u.id),
+          directMessagesEnabled: u.directMessagesEnabled,
         };
       })
       .sort((a, b) => {
-        // 1. Unread first
-        if (b.unread !== a.unread) return b.unread - a.unread;
-        
-        // 2. Online users
-        if (a.isOnline !== b.isOnline) return a.isOnline ? -1 : 1;
-
-        // 3. Last message time (recent first)
-        if (a.lastMessageAt && b.lastMessageAt) {
-          return new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime();
+        // 1. Departmana göre sırala (A'dan Z'ye, null olanlar sona)
+        const depA = a.department || "ZZZ_NoDepartment";
+        const depB = b.department || "ZZZ_NoDepartment";
+        if (depA !== depB) {
+          return depA.localeCompare(depB, "tr");
         }
-        if (a.lastMessageAt) return -1;
-        if (b.lastMessageAt) return 1;
-
-        // 4. Alphabetical
+        
+        // 2. İsme göre A-Z
         return a.name.localeCompare(b.name, "tr");
       });
 
@@ -225,9 +229,39 @@ export async function sendMessage(
 
     const recipient = await prisma.user.findUnique({
       where: { id: recipientId },
-      select: { id: true },
+      select: { id: true, directMessagesEnabled: true },
     });
     if (!recipient) return { ok: false, error: "Kullanıcı bulunamadı." };
+
+    if (!recipient.directMessagesEnabled) {
+      return { ok: false, error: "Bu kullanıcı mesaj alımını kapatmış." };
+    }
+
+    // Engelleme kontrolü (Karşı taraf beni engellemiş mi?)
+    const blockCheck = await prisma.userBlock.findUnique({
+      where: {
+        blockerId_blockedId: {
+          blockerId: recipientId,
+          blockedId: me.id
+        }
+      }
+    });
+    if (blockCheck) {
+      return { ok: false, error: "Bu kullanıcıya mesaj gönderemezsiniz (Engellendiniz)." };
+    }
+
+    // Ben karşı tarafı engellemiş miyim?
+    const myBlockCheck = await prisma.userBlock.findUnique({
+      where: {
+        blockerId_blockedId: {
+          blockerId: me.id,
+          blockedId: recipientId
+        }
+      }
+    });
+    if (myBlockCheck) {
+      return { ok: false, error: "Engellediğiniz bir kullanıcıya mesaj gönderemezsiniz. Önce engeli kaldırın." };
+    }
 
     const msg = await prisma.directMessage.create({
       data: {
@@ -347,6 +381,45 @@ export async function deleteConversation(otherId: string): Promise<{ ok: boolean
     await prisma.directMessage.updateMany({
       where: { senderId: otherId, recipientId: me.id },
       data: { deletedByRecipient: true },
+    });
+    return { ok: true };
+  } catch {
+    return { ok: false };
+  }
+}
+
+export async function toggleDirectMessagesAction(enabled: boolean): Promise<{ ok: boolean }> {
+  try {
+    const me = await requireUser();
+    await prisma.user.update({
+      where: { id: me.id },
+      data: { directMessagesEnabled: enabled }
+    });
+    return { ok: true };
+  } catch {
+    return { ok: false };
+  }
+}
+
+export async function blockUserAction(userId: string): Promise<{ ok: boolean }> {
+  try {
+    const me = await requireUser();
+    await prisma.userBlock.create({
+      data: { blockerId: me.id, blockedId: userId }
+    });
+    return { ok: true };
+  } catch {
+    return { ok: false };
+  }
+}
+
+export async function unblockUserAction(userId: string): Promise<{ ok: boolean }> {
+  try {
+    const me = await requireUser();
+    await prisma.userBlock.delete({
+      where: {
+        blockerId_blockedId: { blockerId: me.id, blockedId: userId }
+      }
     });
     return { ok: true };
   } catch {

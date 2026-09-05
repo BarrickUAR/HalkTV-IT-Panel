@@ -29,7 +29,7 @@ export default async function EditUserPage({
       phone: true,
       employeeNo: true,
       notes: true,
-        
+      directMessagesEnabled: true,
     },
   });
   if (!user) notFound();

@@ -15,6 +15,7 @@ import {
   HiOutlineClock,
   HiOutlineArrowDownTray,
   HiOutlineArchiveBox,
+  HiOutlineNoSymbol,
 } from "react-icons/hi2";
 import { toast } from "sonner";
 
@@ -29,6 +30,8 @@ import {
   archiveConversation,
   unarchiveConversation,
   deleteConversation,
+  blockUserAction,
+  unblockUserAction,
   type Contact,
   type MessageDTO,
 } from "@/app/(app)/messages/actions";
@@ -270,7 +273,7 @@ export function LiveChat() {
       if (res.ok && res.message) {
         setThread((p) => p.map(m => m.id === tmpId ? res.message! : m));
       } else {
-        // Hata olursa thread'i güncelle
+        toast.error(res.error || "Gönderilemedi.");
         try {
           const rows = await fetchThread(a.id);
           setThread(rows);
@@ -410,6 +413,33 @@ export function LiveChat() {
                >
                  <HiOutlineTrash className="size-5" />
                </button>
+               <button
+                 type="button"
+                 onClick={() => {
+                   const isBlocked = active.isBlocked;
+                   if (!isBlocked && !confirm("Bu kişiyi engellemek istediğinize emin misiniz? Size mesaj gönderemeyecek.")) return;
+                   
+                   startSend(async () => {
+                     const ok = isBlocked 
+                       ? await unblockUserAction(active.id)
+                       : await blockUserAction(active.id);
+                     
+                     if (ok.ok) {
+                       toast.success(isBlocked ? "Engel kaldırıldı." : "Kullanıcı engellendi.");
+                       const r = await fetchContacts(q);
+                       setContacts(r.contacts);
+                       setActive((prev) => prev ? { ...prev, isBlocked: !isBlocked } : null);
+                     }
+                   });
+                 }}
+                 title={active.isBlocked ? "Engeli Kaldır" : "Kişiyi Engelle"}
+                 className={cn(
+                   "rounded-full p-2 transition-colors",
+                   active.isBlocked ? "bg-red-500 text-white hover:bg-red-600" : "hover:bg-white/20 text-white/80 hover:text-white"
+                 )}
+               >
+                 <HiOutlineNoSymbol className="size-5" />
+               </button>
              </div>
           )}
         </div>
@@ -477,15 +507,24 @@ export function LiveChat() {
                     if (a.unread > 0 && b.unread === 0) return -1;
                     if (b.unread > 0 && a.unread === 0) return 1;
                     
-                    // 2. En son mesajlaşılanlar
-                    if (a.lastMessageAt && !b.lastMessageAt) return -1;
-                    if (!a.lastMessageAt && b.lastMessageAt) return 1;
-                    if (a.lastMessageAt && b.lastMessageAt) {
-                      return new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime();
+                    // 2. Departmana göre sırala (sadece Sohbet sekmesi için)
+                    if (tab === "chat") {
+                      const depA = a.department || "ZZZ_NoDepartment";
+                      const depB = b.department || "ZZZ_NoDepartment";
+                      if (depA !== depB) {
+                        return depA.localeCompare(depB, "tr");
+                      }
+                    } else {
+                      // 3. En son mesajlaşılanlar (destek veya arşiv için)
+                      if (a.lastMessageAt && !b.lastMessageAt) return -1;
+                      if (!a.lastMessageAt && b.lastMessageAt) return 1;
+                      if (a.lastMessageAt && b.lastMessageAt) {
+                        return new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime();
+                      }
                     }
                     
-                    // 3. Alfabetik sıralama
-                    return a.name.localeCompare(b.name);
+                    // 4. Alfabetik sıralama
+                    return a.name.localeCompare(b.name, "tr");
                   });
 
                   if (visibleContacts.length === 0) {
@@ -496,12 +535,29 @@ export function LiveChat() {
                      );
                   }
 
+                  let currentDepartment = "";
+
                   return (
                     <>
-                      {visibleContacts.map((c) => (
-                        <button
-                          key={c.id}
-                          type="button"
+                      {visibleContacts.map((c) => {
+                        let showDepartmentHeader = false;
+                        if (tab === "chat") {
+                          const dep = c.department || "Diğer Departmanlar";
+                          if (dep !== currentDepartment) {
+                            showDepartmentHeader = true;
+                            currentDepartment = dep;
+                          }
+                        }
+                        
+                        return (
+                          <div key={c.id}>
+                            {showDepartmentHeader && (
+                              <div className="bg-muted/30 px-4 py-1.5 sticky top-0 z-10 backdrop-blur-md border-y border-border/50">
+                                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{currentDepartment}</span>
+                              </div>
+                            )}
+                            <button
+                              type="button"
                           disabled={c.isMe}
                           onClick={() => {
                             setThread([]);
@@ -541,6 +597,12 @@ export function LiveChat() {
                                 <span className={c.unread > 0 ? "font-bold text-foreground" : ""}>{c.lastMessage}</span>
                               </p>
                             )}
+                            {c.isBlocked && (
+                              <p className="text-[10px] font-semibold text-red-500 mt-1 uppercase">Engellendi</p>
+                            )}
+                            {c.directMessagesEnabled === false && (
+                              <p className="text-[10px] font-semibold text-amber-500 mt-1 uppercase">Mesaj Alımı Kapalı</p>
+                            )}
                           </div>
                           {c.unread > 0 ? (
                             <div className="relative">
@@ -551,8 +613,10 @@ export function LiveChat() {
                             </div>
                           ) : null}
                         </button>
-                      ))}
-                    </>
+                      </div>
+                    );
+                  })}
+                </>
                   );
                 })()
               )}
@@ -708,47 +772,59 @@ export function LiveChat() {
               </div>
             )}
 
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                send();
-              }}
-              className="flex items-center gap-2 border-t bg-background p-3 shadow-inner"
-            >
-              {/* Gizli dosya input */}
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.zip,.rar"
-                className="hidden"
-                onChange={handleFileChange}
-              />
-
-              {/* Dosya ekleme butonu */}
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                title="Dosya / Görsel ekle"
-                className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-border bg-muted/40 text-muted-foreground transition-all hover:border-primary/50 hover:text-primary hover:bg-primary/5"
+            {active?.isBlocked ? (
+              <div className="border-t bg-muted p-4 text-center">
+                <p className="text-sm font-semibold text-red-500">Bu kullanıcıyı engellediniz.</p>
+                <p className="text-xs text-muted-foreground mt-1">Mesaj göndermek için engeli kaldırın.</p>
+              </div>
+            ) : active?.directMessagesEnabled === false ? (
+              <div className="border-t bg-muted p-4 text-center">
+                <p className="text-sm font-semibold text-amber-500">Mesaj Alımı Kapalı</p>
+                <p className="text-xs text-muted-foreground mt-1">Bu kullanıcı mesaj alımını kapatmış.</p>
+              </div>
+            ) : (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  send();
+                }}
+                className="flex items-center gap-2 border-t bg-background p-3 shadow-inner"
               >
-                <HiOutlinePaperClip className="size-5" />
-              </button>
+                {/* Gizli dosya input */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.zip,.rar"
+                  className="hidden"
+                  onChange={handleFileChange}
+                />
 
-              <input
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                placeholder="Mesaj yaz…"
-                className="h-11 flex-1 rounded-xl border bg-muted/40 px-4 text-sm outline-none focus-visible:border-primary/50 focus-visible:bg-background transition-colors"
-              />
-              <button
-                type="submit"
-                disabled={!canSend}
-                aria-label="Gönder"
-                className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground transition-all hover:brightness-110 hover:scale-105 disabled:opacity-40 disabled:hover:scale-100"
-              >
-                <HiOutlinePaperAirplane className="size-5 -mr-1" />
-              </button>
-            </form>
+                {/* Dosya ekleme butonu */}
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  title="Dosya / Görsel ekle"
+                  className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-border bg-muted/40 text-muted-foreground transition-all hover:border-primary/50 hover:text-primary hover:bg-primary/5"
+                >
+                  <HiOutlinePaperClip className="size-5" />
+                </button>
+
+                <input
+                  value={text}
+                  onChange={(e) => setText(e.target.value)}
+                  placeholder="Mesaj yaz…"
+                  className="h-11 flex-1 rounded-xl border bg-muted/40 px-4 text-sm outline-none focus-visible:border-primary/50 focus-visible:bg-background transition-colors"
+                />
+                <button
+                  type="submit"
+                  disabled={!canSend}
+                  aria-label="Gönder"
+                  className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground transition-all hover:brightness-110 hover:scale-105 disabled:opacity-40 disabled:hover:scale-100"
+                >
+                  <HiOutlinePaperAirplane className="size-5 -mr-1" />
+                </button>
+              </form>
+            )}
           </>
         )}
       </div>

@@ -85,6 +85,7 @@ const updateSchema = z.object({
   phone: z.string().trim().max(50).optional().or(z.literal("")),
   employeeNo: z.string().trim().max(50).optional().or(z.literal("")),
   notes: z.string().trim().max(2000).optional().or(z.literal("")),
+  directMessagesEnabled: z.string().optional(),
 });
 
 export async function updateUserAction(
@@ -124,6 +125,7 @@ export async function updateUserAction(
       phone: parsed.data.phone || null,
       employeeNo: parsed.data.employeeNo || null,
       notes: parsed.data.notes || null,
+      directMessagesEnabled: parsed.data.directMessagesEnabled === "on",
     },
   });
   revalidatePath("/users");

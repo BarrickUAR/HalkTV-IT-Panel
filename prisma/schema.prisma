@@ -160,6 +160,8 @@ model User {
   accounts Session[]
   authAcc  Account[]
 
+  directMessagesEnabled Boolean @default(true)
+
   requestedTickets Ticket[]        @relation("Requester")
   assignedTickets  Ticket[]        @relation("Assignee")
   comments         TicketComment[]
@@ -172,6 +174,9 @@ model User {
   notifPrefs    NotificationPreference[]
   dmSent        DirectMessage[]          @relation("DMSent")
   dmReceived    DirectMessage[]          @relation("DMReceived")
+
+  blocking      UserBlock[]              @relation("Blocker")
+  blockedBy     UserBlock[]              @relation("Blocked")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -472,4 +477,18 @@ model Feedback {
   createdAt DateTime @default(now())
 
   @@index([createdAt])
+}
+
+// ============================================================
+// LIVE CHAT BLOCKING
+// ============================================================
+model UserBlock {
+  id        String   @id @default(cuid())
+  blockerId String
+  blocker   User     @relation("Blocker", fields: [blockerId], references: [id], onDelete: Cascade)
+  blockedId String
+  blocked   User     @relation("Blocked", fields: [blockedId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([blockerId, blockedId])
 }

@@ -40,6 +40,7 @@ export function EditUserForm({
     phone: string | null;
     employeeNo: string | null;
     notes: string | null;
+    directMessagesEnabled: boolean;
   };
   roles: Role[];
   departments: { id: string; name: string }[];
@@ -146,6 +147,17 @@ export function EditUserForm({
             placeholder="Personel hakkında IT tarafında bilinmesi gereken notlar (Örn: Remote çalışıyor, cihazı şahsi vb.)"
             className={cn(fieldClass, "min-h-[80px] resize-y")}
           />
+        </div>
+
+        <div className="space-y-2 sm:col-span-2 flex flex-row items-center gap-2 pt-2 border-t mt-4">
+          <input 
+            type="checkbox" 
+            id="eu-dms" 
+            name="directMessagesEnabled" 
+            className="size-4"
+            defaultChecked={user.directMessagesEnabled} 
+          />
+          <Label htmlFor="eu-dms" className="cursor-pointer font-medium mb-0">Özel Mesaj (DM) Alımı Açık</Label>
         </div>
       </div>
       {state?.error ? (
