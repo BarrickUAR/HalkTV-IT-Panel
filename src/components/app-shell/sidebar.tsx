@@ -19,6 +19,7 @@ import {
   HiOutlineTicket,
   HiOutlineUsers,
   HiOutlineWrenchScrewdriver,
+  HiOutlineMegaphone,
 } from "react-icons/hi2";
 import type { IconType } from "react-icons";
 
@@ -130,6 +131,7 @@ export function Sidebar({ role }: { role: Role }) {
     },
     {
       items: [
+        { href: "/feedback", label: "Şikayet & Öneri", icon: HiOutlineMegaphone, show: true },
         { href: "/profile", label: "Profilim", icon: HiOutlineCog8Tooth, show: true },
       ],
     },

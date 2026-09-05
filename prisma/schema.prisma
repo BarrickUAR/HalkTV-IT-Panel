@@ -461,3 +461,15 @@ model Computer {
   updatedAt    DateTime    @default(now()) @updatedAt
 }
 
+// ============================================================
+// COMPLAINT & SUGGESTION (FEEDBACK)
+// ============================================================
+model Feedback {
+  id        String   @id @default(cuid())
+  type      String   // "COMPLAINT" | "SUGGESTION"
+  content   String   @db.Text
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
