@@ -24,6 +24,7 @@ import { STATUS_BADGE, STATUS_LABELS } from "@/lib/ticket-labels";
 
 import { prisma } from "@/lib/prisma";
 import { ChatTriggerButton } from "./chat-trigger-button";
+import { DashboardCharts } from "./charts";
 
 export const metadata: Metadata = { title: "Panel" };
 
@@ -78,36 +79,58 @@ export default async function DashboardPage() {
   let stats: Stat[];
   let recent: RecentTicket[];
 
+  let categoryData: any[] = [];
+  let trendData: any[] = [];
+
   const recentSelect = {
     id: true,
-    number: true,
     title: true,
+    number: true,
     status: true,
     createdAt: true,
     requester: {
-      select: {
-        name: true,
-        title: true,
-        department: { select: { name: true } },
-      },
+      select: { name: true, email: true, title: true, department: { select: { name: true } } }
     },
   } as const;
 
     if (it) {
-      const [open, inProgress, unassigned, users, recentTickets] =
-        await Promise.all([
-          prisma.ticket.count({ where: { status: "OPEN" } }),
-          prisma.ticket.count({ where: { status: "IN_PROGRESS" } }),
-          prisma.ticket.count({
-            where: { assigneeId: null, status: { in: ["OPEN", "IN_PROGRESS"] } },
-          }),
-          prisma.user.count(),
-          prisma.ticket.findMany({
-            orderBy: { createdAt: "desc" },
-            take: 6,
-            select: recentSelect,
-          }),
-        ]);
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+      const [open, inProgress, unassigned, users, recentTickets, categoryCounts, trendRaw] = await Promise.all([
+        prisma.ticket.count({ where: { status: "OPEN" } }),
+        prisma.ticket.count({ where: { status: "IN_PROGRESS" } }),
+        prisma.ticket.count({
+          where: { assigneeId: null, status: { in: ["OPEN", "IN_PROGRESS"] } },
+        }),
+        prisma.user.count(),
+        prisma.ticket.findMany({
+          orderBy: { createdAt: "desc" },
+          take: 6,
+          select: recentSelect,
+        }),
+        prisma.ticket.groupBy({
+          by: ['category'],
+          _count: true,
+        }),
+        prisma.ticket.findMany({
+          where: { createdAt: { gte: sevenDaysAgo } },
+          select: { createdAt: true },
+        }),
+      ]);
+
+      const trendMap = new Map<string, number>();
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        trendMap.set(format(d, "dd MMM", { locale: tr }), 0);
+      }
+      trendRaw.forEach(t => {
+        const d = format(t.createdAt, "dd MMM", { locale: tr });
+        if (trendMap.has(d)) trendMap.set(d, trendMap.get(d)! + 1);
+      });
+      trendData = Array.from(trendMap.entries()).map(([date, count]) => ({ date, count }));
+
       stats = [
         {
           icon: HiOutlineTicket,
@@ -139,6 +162,7 @@ export default async function DashboardPage() {
         },
       ];
       recent = recentTickets;
+      categoryData = categoryCounts;
     } else {
       const [myOpen, myResolved, recentTickets] = await Promise.all([
         prisma.ticket.count({
@@ -256,6 +280,8 @@ export default async function DashboardPage() {
             </Link>
           ))}
         </div>
+
+        <DashboardCharts categoryData={categoryData} trendData={trendData} />
       </div>
     );
   }

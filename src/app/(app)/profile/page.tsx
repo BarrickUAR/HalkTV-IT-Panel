@@ -5,6 +5,7 @@ import { can } from "@/lib/rbac/permissions";
 import { ProfileForm } from "./profile-form";
 import { PasswordChangeForm } from "./password-change-form";
 import { IntegrationSection } from "./integration-section";
+import { PushSubscriptionButton } from "./push-subscription-button";
 
 export const metadata: Metadata = { title: "Profilim" };
 
@@ -48,6 +49,8 @@ export default async function ProfilePage() {
 
       <ProfileForm user={dbUser} departments={departments} computers={computers} />
       
+      <PushSubscriptionButton />
+
       <PasswordChangeForm />
 
       {canIntegrate ? <IntegrationSection webhooks={webhooks} /> : null}

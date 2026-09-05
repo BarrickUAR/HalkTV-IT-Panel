@@ -97,6 +97,39 @@ export async function updateProfileAction(
   return { ok: true };
 }
 
+export async function saveSubscriptionAction(sub: { endpoint: string; keys: { p256dh: string; auth: string; } }) {
+  const user = await requireUser();
+  
+  if (!sub.endpoint || !sub.keys?.p256dh || !sub.keys?.auth) {
+    return { error: "Geçersiz abonelik verisi." };
+  }
+
+  // Check if exists
+  const existing = await prisma.pushSubscription.findUnique({
+    where: { endpoint: sub.endpoint }
+  });
+
+  if (existing) {
+    if (existing.userId !== user.id) {
+      await prisma.pushSubscription.update({
+        where: { id: existing.id },
+        data: { userId: user.id, ...sub.keys }
+      });
+    }
+  } else {
+    await prisma.pushSubscription.create({
+      data: {
+        userId: user.id,
+        endpoint: sub.endpoint,
+        p256dh: sub.keys.p256dh,
+        auth: sub.keys.auth,
+      }
+    });
+  }
+
+  return { ok: true };
+}
+
 export async function changePasswordAction(
   _prev: ProfileFormState,
   formData: FormData
