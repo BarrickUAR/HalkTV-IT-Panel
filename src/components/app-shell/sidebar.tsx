@@ -131,7 +131,7 @@ export function Sidebar({ role }: { role: Role }) {
     },
     {
       items: [
-        { href: "/feedback", label: "Şikayet & Öneri", icon: HiOutlineMegaphone, show: true },
+        { href: it ? "/feedback/inbox" : "/feedback", label: it ? "Şikayet ve Öneriler" : "Şikayet & Öneri", icon: HiOutlineMegaphone, show: true },
         { href: "/profile", label: "Profilim", icon: HiOutlineCog8Tooth, show: true },
       ],
     },

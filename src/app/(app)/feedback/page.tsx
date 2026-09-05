@@ -23,14 +23,6 @@ export default async function FeedbackPage() {
             Tamamen anonim olarak düşüncelerinizi, şikayetlerinizi veya önerilerinizi iletebilirsiniz.
           </p>
         </div>
-        {it && (
-          <Link
-            href="/feedback/inbox"
-            className={cn(buttonVariants({ variant: "outline" }), "gap-2")}
-          >
-            <HiOutlineInbox className="size-4" /> Gelen Kutusu
-          </Link>
-        )}
       </div>
 
       <div className="rounded-xl border bg-card overflow-hidden shadow-sm">

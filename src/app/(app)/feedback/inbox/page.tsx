@@ -25,15 +25,8 @@ export default async function FeedbackInboxPage() {
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <div>
-        <Link
-          href="/feedback"
-          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-        >
-          <HiOutlineArrowLeft className="size-4" /> Şikayet & Öneri Formu
-        </Link>
-        <div className="mt-2 flex items-center justify-between">
-          <h1 className="text-2xl font-bold tracking-tight">Gelen Kutusu (Anonim)</h1>
-        </div>
+        <h1 className="text-2xl font-bold tracking-tight">Gelen Şikayet ve Öneriler (Anonim)</h1>
+        <p className="mt-1 text-sm text-muted-foreground">Personellerden gelen tüm geri bildirimler burada listelenir.</p>
       </div>
 
       {feedbackList.length === 0 ? (
