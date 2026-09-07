@@ -22,22 +22,9 @@ import { cn } from "@/lib/utils";
 import type { TicketStatus } from "@prisma/client";
 import { STATUS_BADGE, STATUS_LABELS } from "@/lib/ticket-labels";
 
-import dynamic from "next/dynamic";
 import { prisma } from "@/lib/prisma";
 import { ChatTriggerButton } from "./chat-trigger-button";
-
-const DashboardCharts = dynamic(
-  () => import("./charts").then((mod) => mod.DashboardCharts),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
-        <div className="rounded-xl border bg-card p-5 shadow-sm h-72 animate-pulse bg-muted/20" />
-        <div className="rounded-xl border bg-card p-5 shadow-sm h-72 animate-pulse bg-muted/20" />
-      </div>
-    ),
-  }
-);
+import { DashboardCharts } from "./charts";
 
 export const metadata: Metadata = { title: "Panel" };
 
