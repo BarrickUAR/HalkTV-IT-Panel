@@ -16,6 +16,7 @@ import {
   HiOutlineArrowDownTray,
   HiOutlineArchiveBox,
   HiOutlineNoSymbol,
+  HiOutlineChatBubbleLeftRight,
 } from "react-icons/hi2";
 import { toast } from "sonner";
 
@@ -368,8 +369,8 @@ export function LiveChat() {
           </div>
 
           {!active ? (
-            <div className="ml-auto flex items-center gap-2">
-              {/* DM Toggle Pill */}
+            <div className="ml-auto flex items-center gap-1.5">
+              {/* DM Toggle Button */}
               <button
                 type="button"
                 disabled={pending}
@@ -387,13 +388,17 @@ export function LiveChat() {
                 }}
                 title={myDmEnabled ? "Mesaj alımını kapatmak için tıklayın" : "Mesaj alımını açmak için tıklayın"}
                 className={cn(
-                  "flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold transition-all border shadow-2xs cursor-pointer",
+                  "group flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-all duration-150 border cursor-pointer select-none",
                   myDmEnabled
-                    ? "bg-emerald-500/25 text-white border-emerald-300/40 hover:bg-emerald-500/35"
-                    : "bg-amber-500/25 text-amber-100 border-amber-300/40 hover:bg-amber-500/35"
+                    ? "bg-white/15 hover:bg-white/25 text-white border-white/25 shadow-xs"
+                    : "bg-black/25 hover:bg-black/40 text-white/80 hover:text-white border-white/15"
                 )}
               >
-                <span className={cn("size-2 rounded-full", myDmEnabled ? "bg-emerald-400 animate-pulse" : "bg-amber-400")} />
+                {myDmEnabled ? (
+                  <HiOutlineChatBubbleLeftRight className="size-3.5 transition-transform group-hover:scale-105" />
+                ) : (
+                  <HiOutlineNoSymbol className="size-3.5 text-white/70 transition-transform group-hover:scale-105" />
+                )}
                 <span>{myDmEnabled ? "DM Açık" : "DM Kapalı"}</span>
               </button>
 
@@ -401,7 +406,7 @@ export function LiveChat() {
                 type="button"
                 onClick={toggleOpen}
                 title="Kapat"
-                className="rounded-full p-2 transition-colors hover:bg-white/20 text-white/90 hover:text-white"
+                className="rounded-full p-2 transition-colors hover:bg-white/20 text-white/90 hover:text-white cursor-pointer ml-1"
               >
                 <HiOutlineXMark className="size-5" />
               </button>
@@ -674,12 +679,9 @@ export function LiveChat() {
                             )}
                           </div>
                           {c.unread > 0 ? (
-                            <div className="relative">
-                              <span className="absolute inset-0 rounded-full bg-red-500 animate-ping opacity-20"></span>
-                              <span className="relative flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[11px] font-bold text-white shadow-sm ring-2 ring-background">
-                                {c.unread > 9 ? "9+" : c.unread}
-                              </span>
-                            </div>
+                            <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[11px] font-bold text-white shadow-sm ring-2 ring-background">
+                              {c.unread > 9 ? "9+" : c.unread}
+                            </span>
                           ) : null}
                         </button>
                       </div>
