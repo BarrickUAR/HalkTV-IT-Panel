@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import {
   BarChart,
   Bar,
@@ -25,12 +25,27 @@ export function DashboardCharts({
   categoryData: { category: string; _count: number }[];
   trendData: { date: string; count: number }[];
 }) {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const pieData = useMemo(() => {
     return categoryData.map((d) => ({
       name: CATEGORY_LABELS[d.category as keyof typeof CATEGORY_LABELS] || d.category,
       value: d._count,
     }));
   }, [categoryData]);
+
+  if (!mounted) {
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
+        <div className="rounded-xl border bg-card p-5 shadow-sm h-72 animate-pulse bg-muted/20" />
+        <div className="rounded-xl border bg-card p-5 shadow-sm h-72 animate-pulse bg-muted/20" />
+      </div>
+    );
+  }
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
