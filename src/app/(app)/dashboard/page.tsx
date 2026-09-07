@@ -11,6 +11,9 @@ import {
   HiOutlineTicket,
   HiOutlineExclamationTriangle,
   HiOutlineUsers,
+  HiOutlineBookOpen,
+  HiOutlineCog8Tooth,
+  HiOutlineMegaphone,
 } from "react-icons/hi2";
 import type { IconType } from "react-icons";
 
@@ -186,13 +189,13 @@ export default async function DashboardPage() {
           icon: HiOutlineTicket,
           label: "Açık taleplerim",
           value: myOpen,
-          tone: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
+          tone: "bg-primary/10 text-primary",
         },
         {
           icon: HiOutlineCheckCircle,
           label: "Çözülen",
           value: myResolved,
-          tone: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+          tone: "bg-primary/10 text-primary",
         },
       ];
       recent = recentTickets;
@@ -326,14 +329,36 @@ export default async function DashboardPage() {
             <h2 className="text-sm font-bold flex items-center gap-2 mb-4">
               <HiOutlineViewColumns className="size-4 text-primary" /> Faydalı Linkler
             </h2>
-            <div className="flex flex-col gap-2">
-              <Link href="/knowledge" className="flex items-center justify-between p-3 rounded-xl hover:bg-muted/50 border border-transparent hover:border-border transition-all">
-                <span className="text-sm font-medium">Bilgi Bankası</span>
-                <HiOutlineArrowRight className="size-4 text-muted-foreground" />
+            <div className="flex flex-col gap-2.5">
+              <Link href="/knowledge" className="group flex items-center gap-3 p-3 rounded-xl hover:bg-muted/50 border border-transparent hover:border-border transition-all">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                  <HiOutlineBookOpen className="size-5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <span className="text-sm font-semibold">Bilgi Bankası</span>
+                  <p className="text-xs text-muted-foreground">Kılavuzlar ve çözümler</p>
+                </div>
+                <HiOutlineArrowRight className="size-4 text-muted-foreground group-hover:text-foreground transition-colors" />
               </Link>
-              <Link href="/profile" className="flex items-center justify-between p-3 rounded-xl hover:bg-muted/50 border border-transparent hover:border-border transition-all">
-                <span className="text-sm font-medium">Profil Ayarları</span>
-                <HiOutlineArrowRight className="size-4 text-muted-foreground" />
+              <Link href="/feedback" className="group flex items-center gap-3 p-3 rounded-xl hover:bg-muted/50 border border-transparent hover:border-border transition-all">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                  <HiOutlineMegaphone className="size-5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <span className="text-sm font-semibold">Şikayet ve Öneri</span>
+                  <p className="text-xs text-muted-foreground">Anonim dilekçe kutusu</p>
+                </div>
+                <HiOutlineArrowRight className="size-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+              </Link>
+              <Link href="/profile" className="group flex items-center gap-3 p-3 rounded-xl hover:bg-muted/50 border border-transparent hover:border-border transition-all">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                  <HiOutlineCog8Tooth className="size-5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <span className="text-sm font-semibold">Profil Ayarları</span>
+                  <p className="text-xs text-muted-foreground">Hesap ve tercihler</p>
+                </div>
+                <HiOutlineArrowRight className="size-4 text-muted-foreground group-hover:text-foreground transition-colors" />
               </Link>
             </div>
           </div>
@@ -354,8 +379,8 @@ export default async function DashboardPage() {
             <div className="flex-1 p-2">
               {recent.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full min-h-[200px] text-muted-foreground space-y-3">
-                  <div className="size-16 rounded-full bg-muted flex items-center justify-center">
-                    <HiOutlineTicket className="size-8 opacity-40" />
+                  <div className="size-16 rounded-full bg-primary/10 text-primary flex items-center justify-center mb-1">
+                    <HiOutlineTicket className="size-8" />
                   </div>
                   <p className="text-sm font-medium">Şu an aktif bir talebiniz yok.</p>
                 </div>
@@ -363,11 +388,16 @@ export default async function DashboardPage() {
                 <div className="space-y-1">
                   {recent.map((t) => (
                     <Link key={t.id} href={`/tickets/${t.id}`} className="group flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl hover:bg-muted/40 transition-colors">
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-semibold group-hover:text-primary transition-colors">{t.title}</p>
-                        <p className="font-mono text-[11px] text-muted-foreground mt-1">
-                          #{t.number} <span className="mx-1">•</span> {format(new Date(t.createdAt), "d MMM, HH:mm", { locale: tr })}
-                        </p>
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                          <HiOutlineTicket className="size-5" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-semibold group-hover:text-primary transition-colors">{t.title}</p>
+                          <p className="font-mono text-[11px] text-muted-foreground mt-1">
+                            #{t.number} <span className="mx-1">•</span> {format(new Date(t.createdAt), "d MMM, HH:mm", { locale: tr })}
+                          </p>
+                        </div>
                       </div>
                       <span className={cn("shrink-0 rounded-lg px-2.5 py-1 text-xs font-bold border", STATUS_BADGE[t.status])}>
                         {STATUS_LABELS[t.status]}

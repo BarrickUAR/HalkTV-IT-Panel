@@ -66,7 +66,7 @@ export function EmployeeDock({ role }: { role: Role }) {
             >
               <item.icon className={cn(
                 "size-6 transition-transform group-hover:scale-110",
-                active ? "text-white" : "text-foreground/70 group-hover:text-primary"
+                active ? "text-white" : "text-primary group-hover:text-primary"
               )} />
               <span className={cn(
                 "text-[9.5px] font-medium text-center leading-tight px-1 max-w-full truncate",
