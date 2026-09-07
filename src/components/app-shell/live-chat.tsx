@@ -16,8 +16,6 @@ import {
   HiOutlineArrowDownTray,
   HiOutlineArchiveBox,
   HiOutlineNoSymbol,
-  HiEllipsisVertical,
-  HiOutlineCog6Tooth,
 } from "react-icons/hi2";
 import { toast } from "sonner";
 
@@ -40,13 +38,6 @@ import {
 } from "@/app/(app)/messages/actions";
 
 import { UserAvatar } from "@/components/app-shell/user-avatar";
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -377,49 +368,34 @@ export function LiveChat() {
           </div>
 
           {!active ? (
-            <div className="ml-auto flex items-center gap-1">
-              <DropdownMenu>
-                <DropdownMenuTrigger
-                  title="Mesajlaşma Ayarları"
-                  className="rounded-full p-2 transition-colors hover:bg-white/20 text-white/90 hover:text-white cursor-pointer"
-                >
-                  <HiOutlineCog6Tooth className="size-5" />
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-64 p-3 shadow-xl">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-xs font-bold text-foreground">Özel Mesaj (DM) Alımı</p>
-                      <p className="text-[11px] text-muted-foreground mt-0.5">
-                        {myDmEnabled ? "Diğer personel size mesaj atabilir." : "Mesaj alımınız kapalı."}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      disabled={pending}
-                      onClick={() => {
-                        const next = !myDmEnabled;
-                        startSend(async () => {
-                          const res = await toggleDirectMessagesAction(next);
-                          if (res.ok) {
-                            setMyDmEnabled(next);
-                            toast.success(next ? "Mesaj alımı açıldı." : "Mesaj alımı kapatıldı.");
-                          } else {
-                            toast.error("Ayar güncellenemedi.");
-                          }
-                        });
-                      }}
-                      className={cn(
-                        "rounded-full px-2.5 py-1 text-xs font-bold transition-all shadow-xs shrink-0 cursor-pointer",
-                        myDmEnabled
-                          ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/25 border border-emerald-500/30"
-                          : "bg-amber-500/15 text-amber-600 dark:text-amber-400 hover:bg-amber-500/25 border border-amber-500/30"
-                      )}
-                    >
-                      {myDmEnabled ? "Açık" : "Kapalı"}
-                    </button>
-                  </div>
-                </DropdownMenuContent>
-              </DropdownMenu>
+            <div className="ml-auto flex items-center gap-2">
+              {/* DM Toggle Pill */}
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() => {
+                  const next = !myDmEnabled;
+                  startSend(async () => {
+                    const res = await toggleDirectMessagesAction(next);
+                    if (res.ok) {
+                      setMyDmEnabled(next);
+                      toast.success(next ? "Mesaj alımı açıldı." : "Mesaj alımı kapatıldı.");
+                    } else {
+                      toast.error("Ayar güncellenemedi.");
+                    }
+                  });
+                }}
+                title={myDmEnabled ? "Mesaj alımını kapatmak için tıklayın" : "Mesaj alımını açmak için tıklayın"}
+                className={cn(
+                  "flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold transition-all border shadow-2xs cursor-pointer",
+                  myDmEnabled
+                    ? "bg-emerald-500/25 text-white border-emerald-300/40 hover:bg-emerald-500/35"
+                    : "bg-amber-500/25 text-amber-100 border-amber-300/40 hover:bg-amber-500/35"
+                )}
+              >
+                <span className={cn("size-2 rounded-full", myDmEnabled ? "bg-emerald-400 animate-pulse" : "bg-amber-400")} />
+                <span>{myDmEnabled ? "DM Açık" : "DM Kapalı"}</span>
+              </button>
 
               <button
                 type="button"
@@ -431,107 +407,99 @@ export function LiveChat() {
               </button>
             </div>
           ) : (
-            <div className="ml-auto flex items-center gap-1">
-              <DropdownMenu>
-                <DropdownMenuTrigger
-                  title="Seçenekler"
+            <div className="ml-auto flex items-center gap-0.5">
+              {thread.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (confirm("Bu görüşmeyi sonlandırmak istiyor musunuz? Karşı tarafa bilgi mesajı gidecektir.")) {
+                      const msg = "✅ Bu sohbet sonlandırıldı. Başka bir sorununuz olursa tekrar yazabilirsiniz.";
+                      send(msg);
+                    }
+                  }}
+                  title="Sohbeti Bitir"
                   className="rounded-full p-2 transition-colors hover:bg-white/20 text-white/90 hover:text-white cursor-pointer"
                 >
-                  <HiEllipsisVertical className="size-5" />
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-52 shadow-xl">
-                  {thread.length > 0 && (
-                    <DropdownMenuItem
-                      onClick={() => {
-                        if (confirm("Bu görüşmeyi sonlandırmak istiyor musunuz? Karşı tarafa bilgi mesajı gidecektir.")) {
-                          const msg = "✅ Bu sohbet sonlandırıldı. Başka bir sorununuz olursa tekrar yazabilirsiniz.";
-                          send(msg);
-                        }
-                      }}
-                      className="cursor-pointer"
-                    >
-                      <HiOutlineCheckCircle className="size-4 text-emerald-500 mr-2" />
-                      <span>Sohbeti Bitir</span>
-                    </DropdownMenuItem>
-                  )}
+                  <HiOutlineCheckCircle className="size-5" />
+                </button>
+              )}
 
-                  <DropdownMenuItem
-                    onClick={() => {
-                      const isArchived = active.isArchived;
-                      startSend(async () => {
-                        const ok = isArchived 
-                          ? await unarchiveConversation(active.id) 
-                          : await archiveConversation(active.id);
-                        if (ok.ok) {
-                          toast.success(isArchived ? "Sohbet arşivden çıkarıldı." : "Sohbet arşivlendi.");
-                          const r = await fetchContacts(q);
-                          setContacts(r.contacts);
-                          setActive((prev) => prev ? { ...prev, isArchived: !isArchived } : null);
-                        }
-                      });
-                    }}
-                    className="cursor-pointer"
-                  >
-                    <HiOutlineArchiveBox className="size-4 mr-2 text-muted-foreground" />
-                    <span>{active.isArchived ? "Arşivden Çıkar" : "Arşive Taşı"}</span>
-                  </DropdownMenuItem>
+              <button
+                type="button"
+                onClick={() => {
+                  const isArchived = active.isArchived;
+                  startSend(async () => {
+                    const ok = isArchived 
+                      ? await unarchiveConversation(active.id) 
+                      : await archiveConversation(active.id);
+                    if (ok.ok) {
+                      toast.success(isArchived ? "Sohbet arşivden çıkarıldı." : "Sohbet arşivlendi.");
+                      const r = await fetchContacts(q);
+                      setContacts(r.contacts);
+                      setActive((prev) => prev ? { ...prev, isArchived: !isArchived } : null);
+                    }
+                  });
+                }}
+                title={active.isArchived ? "Arşivden Çıkar" : "Arşive Taşı"}
+                className="rounded-full p-2 transition-colors hover:bg-white/20 text-white/90 hover:text-white cursor-pointer"
+              >
+                <HiOutlineArchiveBox className="size-5" />
+              </button>
 
-                  <DropdownMenuItem
-                    onClick={() => {
-                      if (confirm("Bu kişiyle olan tüm konuşma geçmişini (senin ekranından) silmek istediğine emin misin?")) {
-                        setThread([]);
-                        if (threadCache.current[active.id]) delete threadCache.current[active.id];
-                        startSend(async () => {
-                          const ok = await deleteConversation(active.id);
-                          if (ok.ok) {
-                            const r = await fetchContacts(q);
-                            setContacts(r.contacts);
-                          }
-                        });
+              <button
+                type="button"
+                onClick={() => {
+                  if (confirm("Bu kişiyle olan tüm konuşma geçmişini (senin ekranından) silmek istediğine emin misin?")) {
+                    setThread([]);
+                    if (threadCache.current[active.id]) delete threadCache.current[active.id];
+                    startSend(async () => {
+                      const ok = await deleteConversation(active.id);
+                      if (ok.ok) {
+                        const r = await fetchContacts(q);
+                        setContacts(r.contacts);
                       }
-                    }}
-                    className="cursor-pointer text-destructive focus:text-destructive"
-                  >
-                    <HiOutlineTrash className="size-4 mr-2" />
-                    <span>Tüm Sohbeti Temizle</span>
-                  </DropdownMenuItem>
+                    });
+                  }
+                }}
+                title="Tüm Sohbeti Temizle"
+                className="rounded-full p-2 transition-colors hover:bg-white/20 text-white/90 hover:text-white cursor-pointer"
+              >
+                <HiOutlineTrash className="size-5" />
+              </button>
 
-                  <DropdownMenuSeparator />
-
-                  <DropdownMenuItem
-                    onClick={() => {
-                      const isBlocked = active.isBlocked;
-                      if (!isBlocked && !confirm("Bu kişiyi engellemek istediğinize emin misiniz? Size mesaj gönderemeyecek.")) return;
-                      
-                      startSend(async () => {
-                        const ok = isBlocked 
-                          ? await unblockUserAction(active.id)
-                          : await blockUserAction(active.id);
-                        
-                        if (ok.ok) {
-                          toast.success(isBlocked ? "Engel kaldırıldı." : "Kullanıcı engellendi.");
-                          const r = await fetchContacts(q);
-                          setContacts(r.contacts);
-                          setActive((prev) => prev ? { ...prev, isBlocked: !isBlocked } : null);
-                        }
-                      });
-                    }}
-                    className={cn(
-                      "cursor-pointer",
-                      active.isBlocked ? "text-emerald-600 focus:text-emerald-600" : "text-destructive focus:text-destructive"
-                    )}
-                  >
-                    <HiOutlineNoSymbol className="size-4 mr-2" />
-                    <span>{active.isBlocked ? "Engeli Kaldır" : "Kişiyi Engelle"}</span>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <button
+                type="button"
+                onClick={() => {
+                  const isBlocked = active.isBlocked;
+                  if (!isBlocked && !confirm("Bu kişiyi engellemek istediğinize emin misiniz? Size mesaj gönderemeyecek.")) return;
+                  
+                  startSend(async () => {
+                    const ok = isBlocked 
+                      ? await unblockUserAction(active.id)
+                      : await blockUserAction(active.id);
+                    
+                    if (ok.ok) {
+                      toast.success(isBlocked ? "Engel kaldırıldı." : "Kullanıcı engellendi.");
+                      const r = await fetchContacts(q);
+                      setContacts(r.contacts);
+                      setActive((prev) => prev ? { ...prev, isBlocked: !isBlocked } : null);
+                    }
+                  });
+                }}
+                title={active.isBlocked ? "Engeli Kaldır" : "Kişiyi Engelle"}
+                className={cn(
+                  "rounded-full p-2 transition-colors cursor-pointer",
+                  active.isBlocked ? "bg-red-500 text-white hover:bg-red-600 shadow-xs" : "hover:bg-white/20 text-white/90 hover:text-white"
+                )}
+              >
+                <HiOutlineNoSymbol className="size-5" />
+              </button>
 
               <button
                 type="button"
                 onClick={toggleOpen}
                 title="Kapat"
-                className="rounded-full p-2 transition-colors hover:bg-white/20 text-white/90 hover:text-white"
+                className="rounded-full p-2 transition-colors hover:bg-white/20 text-white/90 hover:text-white cursor-pointer ml-1"
               >
                 <HiOutlineXMark className="size-5" />
               </button>
