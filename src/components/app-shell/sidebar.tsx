@@ -43,19 +43,23 @@ type NavGroup = { title?: string; items: NavItem[] };
 
 export function Sidebar({ role }: { role: Role }) {
   const pathname = usePathname();
-  const [counts, setCounts] = useState({ tickets: 0 });
+  const [counts, setCounts] = useState({ tickets: 0, feedbacks: 0 });
   const it = isITStaff(role);
   const isManager = role === "TEKNIK_MUDUR" || role === "SUPER_ADMIN";
 
   useEffect(() => {
     let live = true;
-    let prev = 0;
+    let prevTickets = 0;
+    let prevFeedbacks = 0;
     const load = async () => {
       try {
         const res = await fetchSidebarBadgeCounts();
         if (live) {
-          if (res.tickets > prev) playNotificationSound();
-          prev = res.tickets;
+          if (res.tickets > prevTickets || res.feedbacks > prevFeedbacks) {
+            playNotificationSound();
+          }
+          prevTickets = res.tickets;
+          prevFeedbacks = res.feedbacks;
           setCounts(res);
         }
       } catch {}
@@ -131,7 +135,13 @@ export function Sidebar({ role }: { role: Role }) {
     },
     {
       items: [
-        { href: it ? "/feedback/inbox" : "/feedback", label: it ? "Şikayet ve Öneriler" : "Şikayet & Öneri", icon: HiOutlineMegaphone, show: true },
+        {
+          href: it ? "/feedback/inbox" : "/feedback",
+          label: it ? "Şikayet ve Öneriler" : "Şikayet & Öneri",
+          icon: HiOutlineMegaphone,
+          show: true,
+          badge: it ? counts.feedbacks : undefined,
+        },
         { href: "/profile", label: "Profilim", icon: HiOutlineCog8Tooth, show: true },
       ],
     },

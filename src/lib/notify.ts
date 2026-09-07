@@ -2,6 +2,7 @@ import type { NotificationType } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { dispatchWebhooks } from "@/lib/integrations";
+import { sendPushNotification } from "@/lib/push";
 
 type NotifyInput = {
   type: NotificationType;
@@ -26,6 +27,13 @@ export async function notify(userId: string, input: NotifyInput) {
     },
   });
   await dispatchWebhooks(input);
+
+  // Tarayıcı Web Push bildirimi gönder
+  sendPushNotification(userId, {
+    title: input.title,
+    body: input.body || "",
+    url: input.link,
+  }).catch(() => {});
 }
 
 /** Birden çok kullanıcıya aynı bildirimi oluştur (tekilleştirir). */
@@ -44,4 +52,15 @@ export async function notifyMany(userIds: string[], input: NotifyInput) {
     })),
   });
   await dispatchWebhooks(input);
+
+  // Tüm hedeflere Web Push gönder
+  await Promise.allSettled(
+    ids.map((id) =>
+      sendPushNotification(id, {
+        title: input.title,
+        body: input.body || "",
+        url: input.link,
+      })
+    )
+  );
 }

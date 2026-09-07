@@ -10,6 +10,8 @@ import {
   HiOutlineArrowTopRightOnSquare,
   HiOutlineDocumentText,
   HiOutlineFunnel,
+  HiOutlineMegaphone,
+  HiOutlineCheckCircle,
 } from "react-icons/hi2";
 
 import { requireRole } from "@/lib/auth-helpers";
@@ -74,6 +76,16 @@ const ACTION_CONFIG: Record<
     tone: "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20",
     icon: HiOutlineComputerDesktop,
   },
+  FEEDBACK_SUBMITTED: {
+    label: "Şikayet / Öneri İletildi",
+    tone: "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20",
+    icon: HiOutlineMegaphone,
+  },
+  FEEDBACK_READ: {
+    label: "Şikayet İncelendi",
+    tone: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
+    icon: HiOutlineCheckCircle,
+  },
 };
 
 function formatAuditDetail(log: any) {
@@ -105,6 +117,12 @@ function formatAuditDetail(log: any) {
       return `${actorName}, "${meta.name}" cihaz kaydını güncelledi. (Kullanıcı: ${meta.assignedUser || "Boşta"})`;
     case "COMPUTER_DELETED":
       return `${actorName}, "${meta.name}" adlı cihazı envanterden sildi.`;
+    case "FEEDBACK_SUBMITTED": {
+      const typeText = meta.type === "COMPLAINT" ? "şikayet" : "öneri";
+      return `Bir personel anonim olarak yeni bir ${typeText} iletti: "${meta.summary || ""}"`;
+    }
+    case "FEEDBACK_READ":
+      return `${actorName}, gelen bir anonim şikayet/öneriyi okundu olarak işaretledi.`;
     default:
       return `${actorName}, ${log.entityType} üzerinde işlem gerçekleştirdi.`;
   }
@@ -114,6 +132,7 @@ function getEntityLink(entityType: string, entityId: string) {
   if (entityType === "Ticket") return `/tickets/${entityId}`;
   if (entityType === "User") return `/users/${entityId}`;
   if (entityType === "Computer") return `/inventory`;
+  if (entityType === "Feedback") return `/feedback/inbox`;
   return null;
 }
 
@@ -129,6 +148,7 @@ export default async function AuditLogPage({
   if (type === "ticket") whereClause.entityType = "Ticket";
   else if (type === "user") whereClause.entityType = "User";
   else if (type === "computer") whereClause.entityType = "Computer";
+  else if (type === "feedback") whereClause.entityType = "Feedback";
 
   const [logs, totalCount, todayCount] = await Promise.all([
     prisma.auditLog.findMany({
@@ -181,6 +201,7 @@ export default async function AuditLogPage({
           { key: "ticket", label: "Talepler" },
           { key: "user", label: "Kullanıcılar" },
           { key: "computer", label: "Cihaz & Envanter" },
+          { key: "feedback", label: "Şikayet & Öneriler" },
         ].map((tab) => {
           const active = (type === undefined && tab.key === undefined) || type === tab.key;
           return (
