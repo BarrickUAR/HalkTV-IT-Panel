@@ -7,6 +7,7 @@ import bcrypt from "bcryptjs";
 import { requireRole } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { assignableRoles } from "@/lib/rbac/roles";
+import { createAuditLog } from "@/lib/audit";
 
 export type UserFormState = { ok?: boolean; error?: string } | undefined;
 
@@ -56,7 +57,7 @@ export async function createUserAction(
   });
   if (dup) return { error: "Bu kullanıcı adı veya e-posta zaten kayıtlı." };
 
-  await prisma.user.create({
+  const newUser = await prisma.user.create({
     data: {
       name: parsed.data.name,
       title: parsed.data.title || null,
@@ -71,6 +72,20 @@ export async function createUserAction(
       notes: parsed.data.notes || null,
     },
   });
+
+  await createAuditLog({
+    actorId: actor.id,
+    action: "USER_CREATED",
+    entityType: "User",
+    entityId: newUser.id,
+    metadata: {
+      name: newUser.name,
+      username: newUser.username,
+      email: newUser.email,
+      role: newUser.role,
+    },
+  });
+
   revalidatePath("/users");
   return { ok: true };
 }
@@ -114,7 +129,7 @@ export async function updateUserAction(
     return { error: "Kendi rolünü/durumunu buradan değiştiremezsin." };
   }
 
-  await prisma.user.update({
+  const updatedUser = await prisma.user.update({
     where: { id: parsed.data.id },
     data: {
       name: parsed.data.name,
@@ -128,6 +143,22 @@ export async function updateUserAction(
       directMessagesEnabled: parsed.data.directMessagesEnabled === "on",
     },
   });
+
+  await createAuditLog({
+    actorId: actor.id,
+    action: "USER_UPDATED",
+    entityType: "User",
+    entityId: updatedUser.id,
+    metadata: {
+      name: updatedUser.name,
+      oldRole: targetUser.role,
+      newRole: updatedUser.role,
+      oldStatus: targetUser.status,
+      newStatus: updatedUser.status,
+      directMessagesEnabled: updatedUser.directMessagesEnabled,
+    },
+  });
+
   revalidatePath("/users");
   revalidatePath(`/users/${parsed.data.id}`);
   return { ok: true };
@@ -153,5 +184,17 @@ export async function resetPasswordAction(
     where: { id },
     data: { passwordHash: await bcrypt.hash(password, 10) },
   });
+
+  await createAuditLog({
+    actorId: actor.id,
+    action: "PASSWORD_RESET",
+    entityType: "User",
+    entityId: targetUser.id,
+    metadata: {
+      name: targetUser.name,
+      email: targetUser.email,
+    },
+  });
+
   return { ok: true };
 }

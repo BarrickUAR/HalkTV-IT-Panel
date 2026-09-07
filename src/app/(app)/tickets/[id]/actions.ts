@@ -147,7 +147,11 @@ export async function updateTicketStatus(
       action: "STATUS_CHANGED",
       entityType: "Ticket",
       entityId: ticketId,
-      metadata: { newStatus: status },
+      metadata: {
+        newStatus: status,
+        title: ticket.title,
+        ticketNumber: ticket.number,
+      },
     }
   });
 
@@ -192,7 +196,11 @@ export async function assignTicket(
       action: "ASSIGNED",
       entityType: "Ticket",
       entityId: ticketId,
-      metadata: { newAssigneeId: assigneeId },
+      metadata: {
+        newAssigneeId: assigneeId,
+        title: current?.title,
+        ticketNumber: current?.number,
+      },
     }
   });
 

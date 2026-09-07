@@ -38,12 +38,12 @@ export type Contact = {
 
 export async function fetchContacts(
   query?: string,
-): Promise<{ contacts: Contact[]; totalUnread: number }> {
+): Promise<{ contacts: Contact[]; totalUnread: number; myDmEnabled: boolean }> {
   const me = await requireUser();
   const q = (query ?? "").trim().toLowerCase();
 
   try {
-    const [users, unread, blocks] = await Promise.all([
+    const [users, unread, blocks, meUser] = await Promise.all([
       prisma.user.findMany({
         where: {
           status: "ACTIVE",
@@ -90,12 +90,17 @@ export async function fetchContacts(
       prisma.userBlock.findMany({
         where: { blockerId: me.id },
         select: { blockedId: true }
-      })
+      }),
+      prisma.user.findUnique({
+        where: { id: me.id },
+        select: { directMessagesEnabled: true },
+      }),
     ]);
 
     const unreadMap = new Map(unread.map((u) => [u.senderId, u._count]));
     const totalUnread = unread.reduce((s, u) => s + u._count, 0);
     const blockedSet = new Set(blocks.map(b => b.blockedId));
+    const myDmEnabled = meUser?.directMessagesEnabled ?? true;
 
     const now = new Date();
     
@@ -139,29 +144,31 @@ export async function fetchContacts(
           image: u.image,
           isOnline,
           isMe: u.id === me.id,
-          lastMessage: lastMsg || undefined,
-          lastMessageAt: lastMsgAt || undefined,
+          lastMessage: lastMsg ?? undefined,
+          lastMessageAt: lastMsgAt ?? undefined,
           isArchived,
           isBlocked: blockedSet.has(u.id),
           directMessagesEnabled: u.directMessagesEnabled,
         };
       })
-      .sort((a, b) => {
-        // 1. Departmana göre sırala (A'dan Z'ye, null olanlar sona)
-        const depA = a.department || "ZZZ_NoDepartment";
-        const depB = b.department || "ZZZ_NoDepartment";
-        if (depA !== depB) {
-          return depA.localeCompare(depB, "tr");
-        }
-        
-        // 2. İsme göre A-Z
-        return a.name.localeCompare(b.name, "tr");
-      });
+      .filter((c) => !c.isMe);
 
-    return { contacts, totalUnread };
+    // Sıralama: Önce okunmamış mesajı olanlar, sonra son mesaj tarihine göre
+    contacts.sort((a, b) => {
+      if (a.unread > 0 && b.unread === 0) return -1;
+      if (b.unread > 0 && a.unread === 0) return 1;
+      if (a.lastMessageAt && b.lastMessageAt) {
+        return new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime();
+      }
+      if (a.lastMessageAt) return -1;
+      if (b.lastMessageAt) return 1;
+      return a.name.localeCompare(b.name, "tr");
+    });
+
+    return { contacts, totalUnread, myDmEnabled };
   } catch (err) {
     console.error("fetchContacts error:", err);
-    return { contacts: [], totalUnread: 0 };
+    return { contacts: [], totalUnread: 0, myDmEnabled: true };
   }
 }
 

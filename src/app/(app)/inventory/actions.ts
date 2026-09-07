@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireRole } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
+import { createAuditLog } from "@/lib/audit";
 
 const computerSchema = z.object({
   id: z.string().optional(),
@@ -14,7 +15,7 @@ const computerSchema = z.object({
 });
 
 export async function saveComputerAction(_prev: any, formData: FormData) {
-  await requireRole(["IT_AGENT", "TEKNIK_YONETMEN", "TEKNIK_MUDUR", "SUPER_ADMIN"]);
+  const actor = await requireRole(["IT_AGENT", "TEKNIK_YONETMEN", "TEKNIK_MUDUR", "SUPER_ADMIN"]);
 
   const raw = {
     id: (formData.get("id") as string) || undefined,
@@ -45,7 +46,7 @@ export async function saveComputerAction(_prev: any, formData: FormData) {
 
   if (id) {
     // Güncelleme
-    await prisma.computer.update({
+    const updated = await prisma.computer.update({
       where: { id },
       data: {
         name,
@@ -53,15 +54,41 @@ export async function saveComputerAction(_prev: any, formData: FormData) {
         userId: userId || null,
         notes: notes || null,
       },
+      include: { user: { select: { name: true } }, department: { select: { name: true } } },
+    });
+
+    await createAuditLog({
+      actorId: actor.id,
+      action: "COMPUTER_UPDATED",
+      entityType: "Computer",
+      entityId: updated.id,
+      metadata: {
+        name: updated.name,
+        assignedUser: updated.user?.name || "Boşta",
+        department: updated.department?.name || "Belirtilmemiş",
+      },
     });
   } else {
     // Yeni Ekleme
-    await prisma.computer.create({
+    const created = await prisma.computer.create({
       data: {
         name,
         departmentId: departmentId || null,
         userId: userId || null,
         notes: notes || null,
+      },
+      include: { user: { select: { name: true } }, department: { select: { name: true } } },
+    });
+
+    await createAuditLog({
+      actorId: actor.id,
+      action: "COMPUTER_CREATED",
+      entityType: "Computer",
+      entityId: created.id,
+      metadata: {
+        name: created.name,
+        assignedUser: created.user?.name || "Boşta",
+        department: created.department?.name || "Belirtilmemiş",
       },
     });
   }
@@ -72,11 +99,24 @@ export async function saveComputerAction(_prev: any, formData: FormData) {
 }
 
 export async function deleteComputerAction(id: string) {
-  await requireRole(["TEKNIK_MUDUR", "SUPER_ADMIN"]);
+  const actor = await requireRole(["TEKNIK_MUDUR", "SUPER_ADMIN"]);
 
-  await prisma.computer.delete({
-    where: { id },
-  });
+  const comp = await prisma.computer.findUnique({ where: { id } });
+  if (comp) {
+    await prisma.computer.delete({
+      where: { id },
+    });
+
+    await createAuditLog({
+      actorId: actor.id,
+      action: "COMPUTER_DELETED",
+      entityType: "Computer",
+      entityId: id,
+      metadata: {
+        name: comp.name,
+      },
+    });
+  }
 
   revalidatePath("/inventory");
   revalidatePath("/profile");

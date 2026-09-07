@@ -73,9 +73,15 @@ export async function createTicket(
   await prisma.auditLog.create({
     data: {
       actorId: user.id,
-      action: "CREATED",
+      action: "TICKET_CREATED",
       entityType: "Ticket",
       entityId: ticket.id,
+      metadata: {
+        ticketNumber: ticket.number,
+        title: ticket.title,
+        priority: ticket.priority,
+        category: ticket.category,
+      },
     }
   });
 

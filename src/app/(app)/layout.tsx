@@ -4,9 +4,9 @@ import { LiveChat } from "@/components/app-shell/live-chat";
 import { Sidebar } from "@/components/app-shell/sidebar";
 import { SidebarAnnouncements } from "@/components/app-shell/sidebar-announcements";
 import { Topbar } from "@/components/app-shell/topbar";
+import { EmployeeDock } from "@/components/app-shell/employee-dock";
 import { requireUser } from "@/lib/auth-helpers";
 import { isITStaff } from "@/lib/rbac/permissions";
-import { prisma } from "@/lib/prisma";
 
 export default async function AppLayout({
   children,
@@ -15,6 +15,27 @@ export default async function AppLayout({
 }) {
   const user = await requireUser();
   const isStaff = isITStaff(user.role);
+
+  if (!isStaff) {
+    return (
+      <div className="flex min-h-dvh flex-col bg-zinc-50 dark:bg-zinc-950">
+        <Topbar name={user.name} email={user.email} role={user.role} />
+        
+        {/* Horizontal/Curved Premium Dock for Employees */}
+        <EmployeeDock role={user.role} />
+        <AnnouncementBanner />
+
+        {/* Main Content */}
+        <main className="flex-1 p-4 lg:p-6 lg:pl-[120px]">
+          <div className="mx-auto max-w-5xl">
+            {children}
+          </div>
+        </main>
+        
+        <LiveChat />
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-dvh flex-col bg-zinc-50 dark:bg-zinc-950">
@@ -42,5 +63,4 @@ export default async function AppLayout({
       <LiveChat />
     </div>
   );
-
 }
