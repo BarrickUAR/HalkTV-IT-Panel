@@ -10,8 +10,19 @@ import { createAuditLog } from "@/lib/audit";
 
 const schema = z.object({
   type: z.enum(["COMPLAINT", "SUGGESTION"]),
+  category: z.string().optional(),
   content: z.string().trim().min(5, "Lütfen içeriği detaylandırın.").max(3000),
+  attachmentUrl: z.string().optional(),
 });
+
+function generatePin(): string {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let result = "HTV-";
+  for (let i = 0; i < 4; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+}
 
 export async function submitFeedbackAction(
   _prev: any,
@@ -20,10 +31,15 @@ export async function submitFeedbackAction(
   const parsed = schema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: parsed.error.issues[0]?.message };
 
+  const pinCode = generatePin();
+
   const feedback = await prisma.feedback.create({
     data: {
+      pinCode,
       type: parsed.data.type,
+      category: parsed.data.category,
       content: parsed.data.content,
+      attachmentUrl: parsed.data.attachmentUrl,
     },
   });
 
@@ -66,7 +82,7 @@ export async function submitFeedbackAction(
   revalidatePath("/feedback");
   revalidatePath("/feedback/inbox");
 
-  return { ok: true };
+  return { ok: true, pinCode };
 }
 
 export async function markFeedbackReadAction(id: string) {
@@ -89,4 +105,3 @@ export async function markFeedbackReadAction(id: string) {
   revalidatePath("/feedback/inbox");
   return { ok: true };
 }
-

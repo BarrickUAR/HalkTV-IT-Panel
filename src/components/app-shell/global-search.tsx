@@ -54,15 +54,15 @@ export function GlobalSearch() {
   }
 
   const count = res
-    ? res.tickets.length + res.users.length
+    ? res.tickets.length + res.users.length + (res.computers?.length ?? 0)
     : 0;
 
   const itemClass =
-    "flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted";
+    "flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted transition-colors";
 
   return (
     <div ref={boxRef} className="relative w-full max-w-md">
-      <div className="flex items-center gap-2 rounded-lg border bg-background px-3">
+      <div className="flex items-center gap-2 rounded-xl border bg-background px-3 transition-colors focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/50">
         <HiOutlineMagnifyingGlass className="size-4 shrink-0 text-muted-foreground" />
         <input
           value={q}
@@ -71,17 +71,22 @@ export function GlobalSearch() {
             setOpen(true);
           }}
           onFocus={() => setOpen(true)}
-          placeholder="Talep, ekipman, kişi ara…"
-          className="h-9 w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+          placeholder="Talep, ekipman, kişi ara..."
+          className="h-10 w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
         />
       </div>
 
       {open && q.trim().length >= 2 ? (
-        <div className="absolute z-50 mt-2 w-full overflow-hidden rounded-lg border bg-card shadow-lg">
+        <div className="absolute z-50 mt-2 w-full overflow-hidden rounded-xl border bg-card shadow-xl">
           {count === 0 ? (
-            <p className="px-3 py-4 text-center text-sm text-muted-foreground">
-              {pending ? "Aranıyor…" : "Sonuç bulunamadı."}
-            </p>
+            <div className="px-3 py-6 text-center text-sm text-muted-foreground flex items-center justify-center gap-2">
+              {pending ? (
+                <>
+                  <div className="size-4 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+                  Aranıyor...
+                </>
+              ) : "Sonuç bulunamadı."}
+            </div>
           ) : (
             <div className="max-h-96 divide-y overflow-y-auto">
               {res!.tickets.length > 0 ? (
@@ -89,36 +94,41 @@ export function GlobalSearch() {
                   {res!.tickets.map((t) => (
                     <button
                       key={t.id}
-                      className={itemClass}
                       onClick={() => go(`/tickets/${t.id}`)}
+                      className={itemClass}
                     >
-                      <HiOutlineTicket className="size-4 shrink-0 text-muted-foreground" />
-                      <span className="shrink-0 font-mono text-xs text-muted-foreground">
-                        {t.number}
-                      </span>
-                      <span className="truncate">{t.title}</span>
+                      <span className="font-mono text-xs text-primary/80">#{t.number}</span>
+                      <span className="truncate font-medium">{t.title}</span>
                     </button>
                   ))}
                 </Group>
               ) : null}
 
-
-
               {res!.users.length > 0 ? (
-                <Group label="Kişiler">
+                <Group label="Kullanıcılar">
                   {res!.users.map((u) => (
                     <button
                       key={u.id}
-                      className={itemClass}
                       onClick={() => go(`/users/${u.id}`)}
+                      className={itemClass}
                     >
-                      <HiOutlineUser className="size-4 shrink-0 text-muted-foreground" />
-                      <span className="truncate">{u.name}</span>
-                      {u.sub ? (
-                        <span className="truncate text-xs text-muted-foreground">
-                          · {u.sub}
-                        </span>
-                      ) : null}
+                      <span className="font-medium truncate">{u.name}</span>
+                      <span className="truncate text-xs text-muted-foreground">{u.sub}</span>
+                    </button>
+                  ))}
+                </Group>
+              ) : null}
+
+              {res!.computers && res!.computers.length > 0 ? (
+                <Group label="Cihazlar">
+                  {res!.computers.map((c) => (
+                    <button
+                      key={c.id}
+                      onClick={() => go(`/inventory`)}
+                      className={itemClass}
+                    >
+                      <span className="font-medium truncate">{c.name}</span>
+                      <span className="truncate text-xs text-muted-foreground">{c.sub}</span>
                     </button>
                   ))}
                 </Group>

@@ -29,10 +29,12 @@ export function UserMenu({
   name,
   email,
   role,
+  image,
 }: {
   name: string | null;
   email: string | null;
   role: Role;
+  image?: string | null;
 }) {
   const router = useRouter();
   const { setTheme, resolvedTheme } = useTheme();
@@ -41,7 +43,7 @@ export function UserMenu({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger className="flex items-center gap-2.5 rounded-full p-1 transition-colors hover:bg-muted/70 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring cursor-pointer">
-        <UserAvatar role={role} className="size-8" />
+        <UserAvatar role={role} image={image} name={name} className="size-8" />
         <div className="hidden text-left sm:block">
           <p className="text-xs font-semibold leading-tight text-foreground">{name ?? email}</p>
           <p className="text-[11px] leading-tight text-muted-foreground">{roleLabel(role)}</p>
@@ -52,13 +54,16 @@ export function UserMenu({
       <DropdownMenuContent align="end" className="w-56 p-1.5 shadow-xl border bg-popover text-popover-foreground">
         <DropdownMenuGroup>
           <DropdownMenuLabel className="p-2 font-normal">
-            <div className="flex flex-col space-y-1">
-              <p className="text-sm font-semibold leading-none">{name ?? "Kullanıcı"}</p>
-              <p className="text-xs leading-none text-muted-foreground truncate">{email}</p>
-              <div className="pt-1">
-                <span className="inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-medium bg-primary/10 text-primary border border-primary/20">
-                  {roleLabel(role)}
-                </span>
+            <div className="flex items-center gap-3">
+              <UserAvatar role={role} image={image} name={name} className="size-10 shrink-0" />
+              <div className="flex flex-col space-y-0.5 min-w-0">
+                <p className="text-sm font-semibold leading-none truncate">{name ?? "Kullanıcı"}</p>
+                <p className="text-xs leading-none text-muted-foreground truncate">{email}</p>
+                <div className="pt-1">
+                  <span className="inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-medium bg-primary/10 text-primary border border-primary/20">
+                    {roleLabel(role)}
+                  </span>
+                </div>
               </div>
             </div>
           </DropdownMenuLabel>

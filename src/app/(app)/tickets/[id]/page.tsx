@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { HiOutlineArrowLeft, HiOutlineStar } from "react-icons/hi2";
+import { HiOutlineArrowLeft, HiOutlineStar, HiOutlineCheckCircle } from "react-icons/hi2";
 import { format } from "date-fns";
 import { tr } from "date-fns/locale";
 
@@ -73,7 +73,7 @@ export default async function TicketDetailPage({
   const ticket = await prisma.ticket.findUnique({
     where: { id },
     include: {
-      requester: { select: { name: true, email: true, department: { select: { name: true } }, computers: { select: { name: true } } } },
+      requester: { select: { name: true, email: true, department: { select: { name: true, floor: true } }, computers: { select: { name: true, notes: true } } } },
       assignee: { select: { name: true } },
       survey: true,
       timeEntries: {
@@ -131,21 +131,67 @@ export default async function TicketDetailPage({
         <HiOutlineArrowLeft className="size-4" /> Talepler
       </Link>
 
-      <div className="mt-4 mb-6 flex items-start justify-between gap-4">
-        <div>
-          <p className="font-mono text-xs text-muted-foreground">
-            {ticket.number}
-          </p>
-          <h1 className="mt-1 text-2xl font-bold tracking-tight">
-            {ticket.title}
-          </h1>
+      <div className="mt-8 mb-10 space-y-8">
+        {/* Progress Bar */}
+        <div className="relative flex items-center justify-between w-full max-w-2xl mx-auto px-4 before:absolute before:inset-0 before:top-1/2 before:h-0.5 before:-translate-y-1/2 before:bg-muted before:z-0">
+          {[
+            { id: "OPEN", label: "Açık" },
+            { id: "IN_PROGRESS", label: "İşlemde" },
+            { id: "WAITING_REQUESTER", label: "Bekliyor" },
+            { id: "RESOLVED", label: "Çözüldü" },
+            { id: "CLOSED", label: "Kapandı" },
+          ].map((step, i, arr) => {
+            const stepIndex = arr.findIndex(s => s.id === step.id);
+            const currentIndex = arr.findIndex(s => s.id === ticket.status);
+            const isCancelled = ticket.status === "CANCELLED";
+            const isCompleted = !isCancelled && stepIndex < currentIndex;
+            const isCurrent = !isCancelled && stepIndex === currentIndex;
+
+            return (
+              <div key={step.id} className="relative z-10 flex flex-col items-center bg-background px-3">
+                <div className={cn(
+                  "flex size-7 items-center justify-center rounded-full border-2 text-xs font-bold transition-all shadow-sm",
+                  isCompleted ? "border-primary bg-primary text-primary-foreground" :
+                  isCurrent ? "border-primary bg-background text-primary ring-4 ring-primary/20" :
+                  "border-muted-foreground/30 bg-muted/30 text-muted-foreground",
+                  isCancelled && "border-red-500 text-red-500 bg-red-500/10"
+                )}>
+                  {isCompleted ? <HiOutlineCheckCircle className="size-4" /> : i + 1}
+                </div>
+                <span className={cn(
+                  "absolute top-9 w-max text-[11px] font-bold tracking-wide",
+                  isCurrent ? "text-primary" : "text-muted-foreground",
+                  isCancelled && "text-red-500"
+                )}>
+                  {step.label}
+                </span>
+              </div>
+            );
+          })}
         </div>
-        {it && (
-          <div className="shrink-0 mt-1 flex items-center gap-2">
-            <MergeTicketButton ticketId={ticket.id} ticketNumber={ticket.number} tickets={mergeableTickets as any} />
-            <TicketActionButtons ticketId={ticket.id} isArchived={!!ticket.archivedAt} />
+
+        {/* Header */}
+        <div className="flex items-start justify-between gap-4 pt-6">
+          <div className="space-y-2.5">
+            <div className="flex items-center gap-3">
+              <span className="rounded-md bg-primary/10 px-2.5 py-1 font-mono text-sm font-bold text-primary shadow-sm border border-primary/20">
+                #{ticket.number}
+              </span>
+              <span className="text-sm font-medium text-muted-foreground">
+                {format(ticket.createdAt, "d MMMM yyyy, HH:mm", { locale: tr })}
+              </span>
+            </div>
+            <h1 className="text-3xl font-extrabold tracking-tight text-foreground">
+              {ticket.title}
+            </h1>
           </div>
-        )}
+          {it && (
+            <div className="shrink-0 mt-1 flex items-center gap-2">
+              <MergeTicketButton ticketId={ticket.id} ticketNumber={ticket.number} tickets={mergeableTickets as any} />
+              <TicketActionButtons ticketId={ticket.id} isArchived={!!ticket.archivedAt} />
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
@@ -232,11 +278,25 @@ export default async function TicketDetailPage({
                 label="Talep eden"
                 value={ticket.requester.name ?? ticket.requester.email ?? "—"}
               />
-              {it && ticket.requester.computers?.[0]?.name ? (
+              {ticket.requester.department?.name ? (
                 <Row
-                  label="Bilgisayar Adı"
-                  value={ticket.requester.computers[0].name}
+                  label="Departman"
+                  value={`${ticket.requester.department.name}${ticket.requester.department.floor ? ` (${ticket.requester.department.floor})` : ""}`}
                 />
+              ) : null}
+              {ticket.requester.computers?.[0]?.name ? (
+                <Row label="Cihaz (Bilgisayar)">
+                  <div className="flex flex-col items-end">
+                    <span className="font-mono text-xs font-bold text-foreground">
+                      🖥️ {ticket.requester.computers[0].name}
+                    </span>
+                    {ticket.requester.computers[0].notes && (
+                      <span className="text-[10px] text-muted-foreground">
+                        {ticket.requester.computers[0].notes.split('|')[0]?.trim()}
+                      </span>
+                    )}
+                  </div>
+                </Row>
               ) : null}
               {!it ? (
                 <Row

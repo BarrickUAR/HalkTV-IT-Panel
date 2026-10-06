@@ -72,7 +72,7 @@ export function CreateUserForm({ roles, departments }: { roles: Role[]; departme
           <select id="cu-departmentId" name="departmentId" className={fieldClass} defaultValue="">
             <option value="" disabled>Seçiniz...</option>
             {departments?.map((d) => (
-              <option key={d.id} value={d.id}>{d.name}</option>
+              <option key={d.id} value={d.id}>{d.name}{d.floor ? ` (${d.floor})` : ""}</option>
             ))}
           </select>
         </div>

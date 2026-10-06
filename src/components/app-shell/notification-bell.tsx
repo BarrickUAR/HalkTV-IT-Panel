@@ -13,6 +13,8 @@ import {
   fetchNotifications,
   markAllRead,
   markRead,
+  deleteNotification,
+  deleteAllNotifications,
   type NotificationDTO,
 } from "@/app/(app)/notifications/actions";
 
@@ -26,11 +28,15 @@ export function NotificationBell() {
 
   async function refresh() {
     try {
-      const next = await fetchNotifications();
+      const res = await fetch("/api/poll");
+      if (!res.ok) return;
+      const data = await res.json();
+      const next = data.notifications;
+
       // İlk yüklemeden sonra gelen YENİ okunmamışları anlık toast ile duyur.
       if (primed.current) {
         const fresh = next.filter(
-          (n) => !n.isRead && !seenIds.current.has(n.id),
+          (n: NotificationDTO) => !n.isRead && !seenIds.current.has(n.id),
         );
         if (fresh.length > 0) {
           const latest = fresh[0];
@@ -40,7 +46,7 @@ export function NotificationBell() {
           });
         }
       }
-      seenIds.current = new Set(next.map((n) => n.id));
+      seenIds.current = new Set(next.map((n: NotificationDTO) => n.id));
       primed.current = true;
       setItems(next);
     } catch {
@@ -82,18 +88,32 @@ export function NotificationBell() {
         <div className="absolute right-0 top-11 z-50 w-80 overflow-hidden rounded-xl border bg-popover text-popover-foreground shadow-lg">
           <div className="flex items-center justify-between border-b px-4 py-2.5">
             <span className="text-sm font-semibold">Bildirimler</span>
-            {unread > 0 ? (
-              <button
-                type="button"
-                onClick={async () => {
-                  await markAllRead();
-                  refresh();
-                }}
-                className="text-xs text-primary hover:underline"
-              >
-                Tümünü okundu işaretle
-              </button>
-            ) : null}
+            <div className="flex items-center gap-2">
+              {unread > 0 ? (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await markAllRead();
+                    refresh();
+                  }}
+                  className="text-xs text-primary hover:underline"
+                >
+                  Tümünü Oku
+                </button>
+              ) : null}
+              {items.length > 0 && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await deleteAllNotifications();
+                    refresh();
+                  }}
+                  className="text-xs text-destructive hover:underline"
+                >
+                  Temizle
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="max-h-96 overflow-y-auto">
@@ -103,43 +123,56 @@ export function NotificationBell() {
               </p>
             ) : (
               items.map((n) => (
-                <Link
-                  key={n.id}
-                  href={n.link ?? "#"}
-                  onClick={() => {
-                    if (!n.isRead) {
-                      setItems((prev) =>
-                        prev.map((it) =>
-                          it.id === n.id ? { ...it, isRead: true } : it,
-                        ),
-                      );
-                      markRead(n.id);
-                    }
-                    setOpen(false);
-                  }}
-                  className={cn(
-                    "flex items-start gap-2 border-b px-4 py-3 text-sm last:border-b-0 hover:bg-muted/50",
-                    !n.isRead && "bg-primary/5",
-                  )}
-                >
-                  <span
+                <div key={n.id} className="relative flex items-start group">
+                  <Link
+                    href={n.link ?? "#"}
+                    onClick={() => {
+                      if (!n.isRead) {
+                        setItems((prev) =>
+                          prev.map((it) =>
+                            it.id === n.id ? { ...it, isRead: true } : it,
+                          ),
+                        );
+                        markRead(n.id);
+                      }
+                      setOpen(false);
+                    }}
                     className={cn(
-                      "mt-1.5 size-2 shrink-0 rounded-full",
-                      n.isRead ? "bg-transparent" : "bg-primary",
+                      "flex-1 flex items-start gap-2 border-b px-4 py-3 text-sm last:border-b-0 hover:bg-muted/50",
+                      !n.isRead && "bg-primary/5",
                     )}
-                  />
-                  <div>
-                    <p className="font-medium">{n.title}</p>
-                    {n.body ? (
-                      <p className="text-muted-foreground">{n.body}</p>
-                    ) : null}
-                    <p className="mt-0.5 text-[11px] text-muted-foreground">
-                      {format(new Date(n.createdAt), "d MMM HH:mm", {
-                        locale: tr,
-                      })}
-                    </p>
-                  </div>
-                </Link>
+                  >
+                    <span
+                      className={cn(
+                        "mt-1.5 size-2 shrink-0 rounded-full",
+                        n.isRead ? "bg-transparent" : "bg-primary",
+                      )}
+                    />
+                    <div className="flex-1 pr-6">
+                      <p className="font-medium">{n.title}</p>
+                      {n.body ? (
+                        <p className="text-muted-foreground">{n.body}</p>
+                      ) : null}
+                      <p className="mt-0.5 text-[11px] text-muted-foreground">
+                        {format(new Date(n.createdAt), "d MMM HH:mm", {
+                          locale: tr,
+                        })}
+                      </p>
+                    </div>
+                  </Link>
+                  <button
+                    type="button"
+                    title="Sil"
+                    onClick={async (e) => {
+                      e.preventDefault();
+                      await deleteNotification(n.id);
+                      refresh();
+                    }}
+                    className="absolute right-3 top-3 opacity-0 group-hover:opacity-100 p-1 text-muted-foreground hover:text-destructive transition-all"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M11.7816 4.03157C12.0062 3.80702 12.0062 3.44295 11.7816 3.2184C11.5571 2.99385 11.193 2.99385 10.9685 3.2184L7.50005 6.68682L4.03164 3.2184C3.80708 2.99385 3.44301 2.99385 3.21846 3.2184C2.99391 3.44295 2.99391 3.80702 3.21846 4.03157L6.68688 7.49999L3.21846 10.9684C2.99391 11.193 2.99391 11.557 3.21846 11.7816C3.44301 12.0061 3.80708 12.0061 4.03164 11.7816L7.50005 8.31316L10.9685 11.7816C11.193 12.0061 11.5571 12.0061 11.7816 11.7816C12.0062 11.557 12.0062 11.193 11.7816 10.9684L8.31322 7.49999L11.7816 4.03157Z" fill="currentColor" fillRule="evenodd" clipRule="evenodd"></path></svg>
+                  </button>
+                </div>
               ))
             )}
           </div>

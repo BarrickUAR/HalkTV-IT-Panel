@@ -41,7 +41,14 @@ export default async function DepartmentDetailsPage({
           <HiOutlineArrowLeft className="size-5 text-muted-foreground" />
         </Link>
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">{department.name}</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold tracking-tight">{department.name}</h1>
+            {department.floor && (
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-secondary text-secondary-foreground border border-border">
+                {department.floor}
+              </span>
+            )}
+          </div>
           <p className="text-sm text-muted-foreground mt-1">
             Bu departmana ait kayıtlı personel ve cihazların detaylı listesi.
           </p>

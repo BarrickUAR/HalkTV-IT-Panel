@@ -123,12 +123,19 @@
 @layer base {
   * {
     @apply border-border outline-ring/50;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
   }
   body {
     @apply bg-background text-foreground;
+    letter-spacing: -0.011em;
   }
   html {
     @apply font-sans;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
   }
   select {
     @apply bg-background text-foreground border-border;
@@ -140,6 +147,9 @@
   ::selection {
     background-color: var(--primary);
     color: var(--primary-foreground);
+  }
+  button, a {
+    @apply cursor-pointer;
   }
 }
 
@@ -158,4 +168,18 @@
   .animate-marquee:hover {
     animation-play-state: paused;
   }
+}
+
+/* Custom Sonner Toast Animation */
+[data-sonner-toast] {
+  animation: slideDownFadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
+}
+@keyframes slideDownFadeIn {
+  0% { opacity: 0; transform: translateY(-20px) scale(0.95); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Widget Page Transparency Hack */
+body:has(.widget-page) {
+  background: transparent !important;
 }

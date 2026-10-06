@@ -39,14 +39,14 @@ export default function RootLayout({
         <SuppressWarnings />
         <ThemeProvider
           attribute="class"
-          defaultTheme="system"
-          enableSystem
+          defaultTheme="dark"
+          enableSystem={false}
           disableTransitionOnChange
         >
           {children}
           <Toaster richColors position="top-right" />
         </ThemeProvider>
-        
+
         {/* PWA Service Worker Registration */}
         <Script
           id="pwa-sw"

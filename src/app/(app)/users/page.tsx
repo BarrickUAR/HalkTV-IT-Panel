@@ -7,6 +7,7 @@ import { assignableRoles, ROLE_LABELS } from "@/lib/rbac/roles";
 import { cn } from "@/lib/utils";
 
 import { CreateUserForm } from "./create-user-form";
+import { UserAvatar } from "@/components/app-shell/user-avatar";
 
 import { buttonVariants } from "@/components/ui/button";
 
@@ -15,13 +16,13 @@ export const metadata: Metadata = { title: "Kullanıcı Yönetimi" };
 export default async function UsersPage(props: {
   searchParams: Promise<{ q?: string; role?: string; sort?: string }>;
 }) {
-  const actor = await requireRole(["TEKNIK_YONETMEN", "TEKNIK_MUDUR", "SUPER_ADMIN"]);
+  const actor = await requireRole(["SUPER_ADMIN", "TEKNIK_MUDUR", "TEKNIK_YONETMEN", "IT_AGENT"]);
   const searchParams = await props.searchParams;
   const q = searchParams.q ?? "";
   const roleFilter = searchParams.role ?? "";
 
   const sortParam = searchParams.sort ?? "dateDesc"; // "dateDesc", "dateAsc", "nameAsc", "nameDesc", "role"
-  
+
   let orderBy: any = { createdAt: "desc" };
   if (sortParam === "dateAsc") orderBy = { createdAt: "asc" };
   if (sortParam === "nameAsc") orderBy = { name: "asc" };
@@ -43,8 +44,11 @@ export default async function UsersPage(props: {
           roleFilter ? { role: roleFilter as any } : {},
         ],
       },
+      include: {
+        computers: { select: { name: true, notes: true }, take: 1 },
+      },
     }),
-    prisma.department.findMany({ orderBy: { name: "asc" } }),
+    prisma.department.findMany({ select: { id: true, name: true, floor: true }, orderBy: [{ sortOrder: "asc" }, { name: "asc" }] }),
   ]);
 
   if (sortParam === "role") {
@@ -95,6 +99,7 @@ export default async function UsersPage(props: {
                 </Link>
               </th>
               <th className="px-4 py-3 font-medium">Durum</th>
+              <th className="px-4 py-3 font-medium">Bağlı Cihaz</th>
               <th className="px-4 py-3 font-medium">
                 <Link href={`?sort=${sortParam === 'dateDesc' ? 'dateAsc' : 'dateDesc'}${q ? `&q=${q}` : ''}`} className="hover:text-foreground hover:underline">
                   Kayıt Tarihi
@@ -108,8 +113,13 @@ export default async function UsersPage(props: {
             {users.map((u) => (
               <tr key={u.id} className="border-t hover:bg-muted/30">
                 <td className="px-4 py-3 font-medium">
-                  {u.name ?? "—"}
-                  {u.username && <span className="block text-xs font-normal text-muted-foreground">@{u.username}</span>}
+                  <div className="flex items-center gap-2.5">
+                    <UserAvatar image={u.image} name={u.name} className="size-8 shrink-0" />
+                    <div>
+                      <span className="block font-semibold text-foreground">{u.name ?? "—"}</span>
+                      {u.username && <span className="block text-xs font-normal text-muted-foreground font-mono">@{u.username}</span>}
+                    </div>
+                  </div>
                 </td>
                 <td className="px-4 py-3 text-muted-foreground">{u.email}</td>
                 <td className="px-4 py-3">{(ROLE_LABELS as Record<string, string>)[u.role] ?? u.role}</td>
@@ -124,6 +134,22 @@ export default async function UsersPage(props: {
                   >
                     {u.status === "ACTIVE" ? "Aktif" : "Pasif"}
                   </span>
+                </td>
+                <td className="px-4 py-3 text-xs">
+                  {u.computers?.[0]?.name ? (
+                    <div className="flex flex-col gap-0.5">
+                      <span className="inline-flex items-center gap-1 font-mono font-semibold px-2 py-0.5 rounded bg-muted text-foreground border text-[11px] w-fit">
+                        🖥️ {u.computers[0].name}
+                      </span>
+                      {u.computers[0].notes?.includes("IP:") && (
+                        <span className="font-mono text-[10px] text-blue-700 bg-blue-50/70 border border-blue-200/60 px-1.5 py-0.5 rounded w-fit">
+                          {u.computers[0].notes.match(/IP:\s*([^\s|]+)/)?.[1]}
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    <span className="text-muted-foreground text-[11px]">—</span>
+                  )}
                 </td>
                 <td className="px-4 py-3 text-muted-foreground text-xs">
                   {new Date(u.createdAt).toLocaleDateString("tr-TR")}

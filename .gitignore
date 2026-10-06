@@ -15,6 +15,7 @@
 
 # next.js
 /.next/
+/.next-dev/
 /out/
 
 # production
@@ -40,3 +41,20 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# large static downloads
+/public/downloads/*
+!/public/downloads/.gitkeep
+
+# Runtime/user data and local diagnostics must never be published.
+/storage/
+/public/uploads/
+/logs/
+*.log
+*.exe
+*.pdb
+**/bin/
+**/obj/
+**/publish*/
+**/*.csproj.user
+**/config.json

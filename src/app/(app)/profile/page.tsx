@@ -28,9 +28,10 @@ export default async function ProfilePage() {
         departmentId: true,
         phone: true,
         directMessagesEnabled: true,
+        showInLiveChat: true,
       },
     }),
-    prisma.department.findMany({ orderBy: { name: "asc" } }),
+    prisma.department.findMany({ select: { id: true, name: true, floor: true }, orderBy: [{ sortOrder: "asc" }, { name: "asc" }] }),
     prisma.computer.findMany({
       where: { OR: [{ userId: null }, { userId: user.id }] },
       orderBy: { name: "asc" },
@@ -46,6 +47,9 @@ export default async function ProfilePage() {
 
   if (!dbUser) return null;
 
+  const itRoles = ["IT_AGENT", "TEKNIK_YONETMEN", "TEKNIK_MUDUR", "SUPER_ADMIN"];
+  const isIT = itRoles.includes(user.role);
+
   return (
     <div className="mx-auto max-w-3xl space-y-6 pb-12">
       <div>
@@ -54,14 +58,16 @@ export default async function ProfilePage() {
       </div>
 
       <ProfileForm user={dbUser} departments={departments} computers={computers} />
-      
+
       <PushSubscriptionButton />
 
       <PasswordChangeForm />
 
-      <MessagesSettings 
-        initialEnabled={dbUser.directMessagesEnabled} 
-        blockedUsers={blockedUsers.map(b => ({ id: b.blocked.id, name: b.blocked.name || "İsimsiz" }))} 
+      <MessagesSettings
+        initialEnabled={dbUser.directMessagesEnabled}
+        initialShowInLiveChat={dbUser.showInLiveChat}
+        isIT={isIT}
+        blockedUsers={blockedUsers.map(b => ({ id: b.blocked.id, name: b.blocked.name || "İsimsiz" }))}
       />
 
       {canIntegrate ? <IntegrationSection webhooks={webhooks} /> : null}

@@ -28,6 +28,7 @@ export const requireUser = cache(async () => {
       image: true,
       role: true,
       status: true,
+      title: true,
       departmentId: true,
       department: {
         select: {
@@ -47,4 +48,40 @@ export async function requireRole(roles: Role[]) {
   const user = await requireUser();
   if (!roles.includes(user.role)) redirect("/dashboard");
   return user;
+}
+
+/**
+ * Kiosk / API kimlik doğrulama yardımcısı.
+ * 1. Web session (NextAuth JWT)
+ * 2. Explicit userId
+ * 3. Hostname (Bilgisayara zimmetli kullanıcı)
+ * 4. Windows username (User.username veya email prefix)
+ */
+export async function resolveKioskUser(params?: {
+  userId?: string | null;
+  hostname?: string | null;
+  username?: string | null;
+}) {
+  // 1. Web Session
+  const session = await auth();
+  if (session?.user?.id) {
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        image: true,
+        role: true,
+        status: true,
+        title: true,
+        departmentId: true,
+        department: { select: { id: true, name: true } },
+      },
+    });
+    if (user && user.status === "ACTIVE") return user;
+  }
+
+  // A user ID, hostname or Windows username is not proof of authentication.
+  return null;
 }

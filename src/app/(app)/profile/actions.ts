@@ -11,6 +11,7 @@ export type ProfileFormState = { ok?: boolean; error?: string } | undefined;
 const profileSchema = z.object({
   name: z.string().trim().min(2, "Ad Soyad alanı zorunludur.").optional().or(z.literal("")),
   email: z.string().trim().email("Geçerli bir e-posta adresi giriniz.").optional().or(z.literal("")),
+  title: z.string().trim().optional().or(z.literal("")),
   departmentId: z.string().optional().or(z.literal("")),
   computerId: z.string().optional().or(z.literal("")),
   phone: z.string().trim().optional().or(z.literal("")),
@@ -22,7 +23,7 @@ export async function updateProfileAction(
 ): Promise<ProfileFormState> {
   const user = await requireUser();
   const parsed = profileSchema.safeParse(Object.fromEntries(formData));
-  
+
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message };
   }
@@ -50,15 +51,13 @@ export async function updateProfileAction(
     }
   }
 
-  const imageBase64 = String(formData.get("imageBase64") ?? "");
-
   await prisma.user.update({
     where: { id: user.id },
     data: {
       name: finalName,
       email: finalEmail,
+      title: parsed.data.title !== undefined ? (parsed.data.title || null) : undefined,
       phone: parsed.data.phone || null,
-      ...(imageBase64 ? { image: imageBase64 } : {}),
       // isStaff ise departmanı güncelle (boş string gelirse null yap = temizle)
       ...(isStaff ? { departmentId: parsed.data.departmentId || null } : {}),
     },
@@ -66,7 +65,7 @@ export async function updateProfileAction(
 
   if (isStaff && parsed.data.computerId !== undefined) {
     const currentComputer = await prisma.computer.findFirst({ where: { userId: user.id } });
-    
+
     if (parsed.data.computerId === "") {
       // Bilgisayarı boşa çıkar
       if (currentComputer) {
@@ -99,7 +98,7 @@ export async function updateProfileAction(
 
 export async function saveSubscriptionAction(sub: { endpoint: string; keys: { p256dh: string; auth: string; } }) {
   const user = await requireUser();
-  
+
   if (!sub.endpoint || !sub.keys?.p256dh || !sub.keys?.auth) {
     return { error: "Geçersiz abonelik verisi." };
   }

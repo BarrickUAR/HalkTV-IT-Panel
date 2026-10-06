@@ -16,27 +16,46 @@ import {
   HiOutlineArrowDownTray,
   HiOutlineArchiveBox,
   HiOutlineNoSymbol,
+  HiOutlineCog8Tooth,
+  HiOutlineEllipsisVertical,
   HiOutlineChatBubbleLeftRight,
 } from "react-icons/hi2";
 import { toast } from "sonner";
 
 import { cn, playNotificationSound } from "@/lib/utils";
+import { compareFloors } from "@/lib/floors";
 import {
-  fetchContacts,
-  fetchThread,
-  markThreadRead,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   sendMessage,
-  deleteMessage,
-  unreadMessageCount,
+  toggleDirectMessagesAction,
   archiveConversation,
   unarchiveConversation,
   deleteConversation,
   blockUserAction,
   unblockUserAction,
-  toggleDirectMessagesAction,
+  deleteMessage,
   type Contact,
   type MessageDTO,
 } from "@/app/(app)/messages/actions";
+
+// RSC-Payload Injection loop'unu önlemek için RPC fetch'ler
+const apiFetchContacts = async (q?: string) =>
+  fetch("/api/rpc", { method: "POST", body: JSON.stringify({ action: "fetchContacts", payload: { q } }) }).then(r => r.json());
+
+const apiFetchThread = async (id: string) =>
+  fetch("/api/rpc", { method: "POST", body: JSON.stringify({ action: "fetchThread", payload: { id } }) }).then(r => r.json());
+
+const apiUnreadMessageCount = async () =>
+  fetch("/api/rpc", { method: "POST", body: JSON.stringify({ action: "unreadMessageCount" }) }).then(r => r.json());
+
+const apiMarkThreadRead = async (id: string) =>
+  fetch("/api/rpc", { method: "POST", body: JSON.stringify({ action: "markThreadRead", payload: { id } }) }).then(r => r.json());
 
 import { UserAvatar } from "@/components/app-shell/user-avatar";
 
@@ -66,6 +85,7 @@ export function LiveChat() {
   const [text, setText] = useState("");
   const [totalUnread, setTotalUnread] = useState(0);
   const [myDmEnabled, setMyDmEnabled] = useState(true);
+  const [isIT, setIsIT] = useState(false);
   const [pending, startSend] = useTransition();
   const scrollRef = useRef<HTMLDivElement>(null);
   const threadCache = useRef<Record<string, MessageDTO[]>>({});
@@ -78,7 +98,7 @@ export function LiveChat() {
   useEffect(() => {
     const saved = localStorage.getItem("liveChatOpen");
     if (saved === "true") setOpen(true);
-    
+
     // Custom event to open chat from anywhere
     const handleOpenChat = () => {
       setOpen(true);
@@ -106,11 +126,12 @@ export function LiveChat() {
     prevTotal.current = totalUnread;
   }, [totalUnread]);
 
+
   useEffect(() => {
     let live = true;
     async function tick() {
       try {
-        const n = await unreadMessageCount();
+        const n = await apiUnreadMessageCount();
         if (live) setTotalUnread(n);
       } catch {}
     }
@@ -128,11 +149,12 @@ export function LiveChat() {
     let live = true;
     async function load() {
       try {
-        const r = await fetchContacts(q);
+        const r = await apiFetchContacts(q);
         if (!live) return;
         setContacts(r.contacts);
         setTotalUnread(r.totalUnread);
         setMyDmEnabled(r.myDmEnabled ?? true);
+        setIsIT(r.isIT ?? false);
       } catch {}
     }
     load(); // Hemen yükle (arkaplanda preload)
@@ -145,18 +167,18 @@ export function LiveChat() {
 
   // Sohbet dizisi
   const prevThreadLen = useRef(0);
-  
+
   useEffect(() => {
     const a = active;
     if (!a) return;
     let live = true;
     prevThreadLen.current = thread.length;
-    
+
     const load = async () => {
       try {
-        const rows = await fetchThread(a.id);
+        const rows = await apiFetchThread(a.id);
         if (!live) return;
-        
+
         if (rows.length > prevThreadLen.current) {
           const lastMsg = rows[rows.length - 1];
           // Eger benden degilse ses cal
@@ -165,17 +187,40 @@ export function LiveChat() {
           }
         }
         prevThreadLen.current = rows.length;
-        
-        // tmp mesajları ezmemek için
+
+        // tmp mesajları ve gelen mesajları ID bazında benzersiz birleştir
         setThread((current) => {
-          const tmpMessages = current.filter(m => m.id.startsWith("tmp-"));
-          return [...rows, ...tmpMessages];
+          const rowsMap = new Map<string, MessageDTO>();
+          for (const r of rows) {
+            rowsMap.set(r.id, r);
+          }
+
+          // Henüz sunucuya gitmekte olan tmp mesajları koru, ancak rows içinde aynı içerikli mesaj zaten geldiyse tmp'yi kaldır
+          for (const m of current) {
+            if (m.id.startsWith("tmp-")) {
+              const alreadyExists = rows.some((r: MessageDTO) => r.fromMe && r.body === m.body);
+              if (!alreadyExists) {
+                rowsMap.set(m.id, m);
+              }
+            }
+          }
+
+          const merged = Array.from(rowsMap.values());
+          // Eğer mesaj listesi değişmediyse aynı referansı koru (böylece gereksiz rerender/refresh olmaz)
+          if (
+            current.length === merged.length &&
+            current.every((m, idx) => m.id === merged[idx]?.id && m.isRead === merged[idx]?.isRead)
+          ) {
+            return current;
+          }
+
+          return merged;
         });
         threadCache.current[a.id] = rows;
         setLoadingThread(false);
-        
+
         if (open) {
-          await markThreadRead(a.id);
+          await apiMarkThreadRead(a.id);
           setContacts((prev) =>
             prev.map((c) => (c.id === a.id ? { ...c, unread: 0 } : c))
           );
@@ -184,18 +229,23 @@ export function LiveChat() {
         setLoadingThread(false);
       }
     };
-    
+
     load(); // Arkaplanda hemen yükle
-    const t = setInterval(load, open ? 4000 : 30000);
+    const t = setInterval(load, open ? 2500 : 30000);
     return () => {
       live = false;
       clearInterval(t);
     };
   }, [active, open]);
 
+  // Sadece yeni mesaj eklendiğinde veya aktif kullanıcı değiştiğinde alta kaydır
+  const lastThreadLenRef = useRef(0);
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
-  }, [thread, active]);
+    if (thread.length !== lastThreadLenRef.current) {
+      lastThreadLenRef.current = thread.length;
+      scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+    }
+  }, [thread.length, active]);
 
   // ── File picker ────────────────────────────────────────────────────────────
 
@@ -205,6 +255,16 @@ export function LiveChat() {
 
     // Reset input value so same file can be re-selected
     e.target.value = "";
+
+    if (file.size > 50 * 1024 * 1024) {
+      toast.error("Dosya boyutu 50 MB'yi aşamaz.");
+      return;
+    }
+    const extension = file.name.split(".").pop()?.toLowerCase() || "";
+    if (["exe", "bat", "cmd", "com", "msi", "ps1", "scr", "vbs", "js", "jse", "wsf", "hta", "lnk"].includes(extension)) {
+      toast.error("Çalıştırılabilir veya komut dosyaları yüklenemez.");
+      return;
+    }
 
     if (file.type.startsWith("image/")) {
       const reader = new FileReader();
@@ -259,6 +319,7 @@ export function LiveChat() {
       let uploadedUrl: string | undefined;
       let uploadedName: string | undefined;
       let uploadedType: string | undefined;
+      let attachmentClaimToken: string | undefined;
 
       if (pendingAttachment) {
         try {
@@ -266,26 +327,33 @@ export function LiveChat() {
           fd.append("file", pendingAttachment.file);
           fd.append("subfolder", "messages");
           const resp = await fetch("/api/upload", { method: "POST", body: fd });
-          if (resp.ok) {
-            const json = (await resp.json()) as { url?: string };
-            uploadedUrl = json.url;
-            uploadedName = pendingAttachment.file.name;
-            uploadedType = pendingAttachment.kind;
-          } else {
-            toast.error("Dosya yüklenemedi.");
-          }
+          const json = (await resp.json()) as { url?: string; claimToken?: string; error?: string };
+          if (!resp.ok || !json.url || !json.claimToken) throw new Error(json.error || "Dosya yüklenemedi.");
+          uploadedUrl = json.url;
+          attachmentClaimToken = json.claimToken;
+          uploadedName = pendingAttachment.file.name;
+          uploadedType = pendingAttachment.kind;
         } catch {
           toast.error("Dosya yüklenemedi.");
+          setThread((previous) => previous.filter((message) => message.id !== tmpId));
+          if (customText === undefined) setText(body);
+          setAttachment(pendingAttachment);
+          return;
         }
       }
 
-      const res = await sendMessage(a.id, body, uploadedUrl, uploadedName, uploadedType);
+      const res = await sendMessage(a.id, body, uploadedUrl, uploadedName, uploadedType, tab === "support" ? "it" : "staff", attachmentClaimToken);
       if (res.ok && res.message) {
-        setThread((p) => p.map(m => m.id === tmpId ? res.message! : m));
+        setThread((p) => {
+          if (p.some((m) => m.id === res.message!.id)) {
+            return p.filter((m) => m.id !== tmpId);
+          }
+          return p.map((m) => (m.id === tmpId ? res.message! : m));
+        });
       } else {
         toast.error(res.error || "Gönderilemedi.");
         try {
-          const rows = await fetchThread(a.id);
+          const rows = await apiFetchThread(a.id);
           setThread(rows);
         } catch {}
       }
@@ -294,7 +362,7 @@ export function LiveChat() {
 
   function handleDelete(msgId: string) {
     if (msgId.startsWith("tmp-")) return;
-    
+
     setThread(p => p.filter(m => m.id !== msgId));
     startSend(async () => {
       const r = await deleteMessage(msgId);
@@ -326,7 +394,7 @@ export function LiveChat() {
         ) : null}
       </button>
 
-      <div 
+      <div
         className={cn(
           "fixed right-6 bottom-24 z-50 flex h-[580px] max-h-[calc(100dvh-8rem)] w-[400px] max-w-[calc(100vw-3rem)] flex-col overflow-hidden rounded-2xl border border-border/60 bg-card shadow-2xl transition-all duration-300 origin-bottom-right",
           open ? "scale-100 opacity-100 translate-y-0" : "scale-95 opacity-0 translate-y-4 pointer-events-none"
@@ -343,7 +411,7 @@ export function LiveChat() {
               <HiOutlineArrowLeft className="size-5" />
             </button>
           ) : null}
-          
+
           {active ? (
             <div className="relative">
               <UserAvatar role={active.role} image={active.image} name={active.name} className="size-11 shadow-inner border border-white/20" />
@@ -356,21 +424,27 @@ export function LiveChat() {
               <HiOutlineChatBubbleLeftEllipsis className="size-6" />
             </div>
           )}
-          
+
           <div className="flex-1 min-w-0">
             <p className="truncate text-base font-bold tracking-tight">
               {active ? active.name : "Canlı Destek"}
             </p>
-            <p className="truncate text-xs font-medium text-white/80 mt-0.5">
-              {active 
-                ? (active.department ? `${active.sub} • ${active.department}` : active.sub) 
-                : "HalkTV IT İletişim"}
-            </p>
+            <div className="flex items-center gap-1.5 truncate text-xs font-medium text-white/80 mt-0.5">
+              <span className="truncate">
+                {active
+                  ? (active.department ? `${active.sub} • ${active.department}${active.floor ? ` (${active.floor})` : ""}` : active.sub)
+                  : "HalkTV IT İletişim"}
+              </span>
+              {active?.computerName && (
+                <span className="shrink-0 font-mono text-[10px] bg-white/20 text-white px-1.5 py-0.2 rounded border border-white/20">
+                  🖥️ {active.computerName}
+                </span>
+              )}
+            </div>
           </div>
 
           {!active ? (
-            <div className="ml-auto flex items-center gap-1.5">
-              {/* DM Toggle Button */}
+            <div className="ml-auto flex items-center gap-2">
               <button
                 type="button"
                 disabled={pending}
@@ -381,25 +455,19 @@ export function LiveChat() {
                     if (res.ok) {
                       setMyDmEnabled(next);
                       toast.success(next ? "Mesaj alımı açıldı." : "Mesaj alımı kapatıldı.");
-                    } else {
-                      toast.error("Ayar güncellenemedi.");
-                    }
+                    } else toast.error("Ayar güncellenemedi.");
                   });
                 }}
-                title={myDmEnabled ? "Mesaj alımını kapatmak için tıklayın" : "Mesaj alımını açmak için tıklayın"}
                 className={cn(
-                  "group flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-all duration-150 border cursor-pointer select-none",
+                  "flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold tracking-wide transition-colors border",
                   myDmEnabled
-                    ? "bg-white/15 hover:bg-white/25 text-white border-white/25 shadow-xs"
-                    : "bg-black/25 hover:bg-black/40 text-white/80 hover:text-white border-white/15"
+                    ? "bg-emerald-500/20 text-emerald-50 border-emerald-500/30 hover:bg-emerald-500/30"
+                    : "bg-red-500/20 text-red-50 border-red-500/30 hover:bg-red-500/30"
                 )}
+                title="DM Alımını Aç/Kapat"
               >
-                {myDmEnabled ? (
-                  <HiOutlineChatBubbleLeftRight className="size-3.5 transition-transform group-hover:scale-105" />
-                ) : (
-                  <HiOutlineNoSymbol className="size-3.5 text-white/70 transition-transform group-hover:scale-105" />
-                )}
-                <span>{myDmEnabled ? "DM Açık" : "DM Kapalı"}</span>
+                {myDmEnabled ? <HiOutlineChatBubbleLeftRight className="size-3.5" /> : <HiOutlineNoSymbol className="size-3.5" />}
+                {myDmEnabled ? "Mesaj Alma Açık" : "Mesaj Alma Kapalı"}
               </button>
 
               <button
@@ -413,92 +481,92 @@ export function LiveChat() {
             </div>
           ) : (
             <div className="ml-auto flex items-center gap-0.5">
-              {thread.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (confirm("Bu görüşmeyi sonlandırmak istiyor musunuz? Karşı tarafa bilgi mesajı gidecektir.")) {
-                      const msg = "✅ Bu sohbet sonlandırıldı. Başka bir sorununuz olursa tekrar yazabilirsiniz.";
-                      send(msg);
-                    }
-                  }}
-                  title="Sohbeti Bitir"
-                  className="rounded-full p-2 transition-colors hover:bg-white/20 text-white/90 hover:text-white cursor-pointer"
-                >
-                  <HiOutlineCheckCircle className="size-5" />
-                </button>
-              )}
+              <DropdownMenu>
+                <DropdownMenuTrigger className="rounded-full p-2 transition-colors hover:bg-white/20 text-white/90 hover:text-white cursor-pointer outline-none" title="Seçenekler">
+                  <HiOutlineEllipsisVertical className="size-5" />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  {thread.length > 0 && (
+                    <>
+                      <DropdownMenuItem
+                        onClick={() => {
+                          if (confirm("Bu görüşmeyi sonlandırmak istiyor musunuz? Karşı tarafa bilgi mesajı gidecektir.")) {
+                            const msg = "✅ Bu sohbet sonlandırıldı. Başka bir sorununuz olursa tekrar yazabilirsiniz.";
+                            send(msg);
+                          }
+                        }}
+                      >
+                        <HiOutlineCheckCircle className="mr-2 size-4" />
+                        Sohbeti Bitir
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                    </>
+                  )}
+                  <DropdownMenuItem
+                    onClick={() => {
+                      const isArchived = active.isArchived;
+                      startSend(async () => {
+                        const ok = isArchived
+                          ? await unarchiveConversation(active.id)
+                          : await archiveConversation(active.id);
+                        if (ok.ok) {
+                          toast.success(isArchived ? "Sohbet arşivden çıkarıldı." : "Sohbet arşivlendi.");
+                          const r = await apiFetchContacts(q);
+                          setContacts(r.contacts);
+                          setActive((prev) => prev ? { ...prev, isArchived: !isArchived } : null);
+                        }
+                      });
+                    }}
+                  >
+                    <HiOutlineArchiveBox className="mr-2 size-4" />
+                    {active.isArchived ? "Arşivden Çıkar" : "Arşive Taşı"}
+                  </DropdownMenuItem>
 
-              <button
-                type="button"
-                onClick={() => {
-                  const isArchived = active.isArchived;
-                  startSend(async () => {
-                    const ok = isArchived 
-                      ? await unarchiveConversation(active.id) 
-                      : await archiveConversation(active.id);
-                    if (ok.ok) {
-                      toast.success(isArchived ? "Sohbet arşivden çıkarıldı." : "Sohbet arşivlendi.");
-                      const r = await fetchContacts(q);
-                      setContacts(r.contacts);
-                      setActive((prev) => prev ? { ...prev, isArchived: !isArchived } : null);
-                    }
-                  });
-                }}
-                title={active.isArchived ? "Arşivden Çıkar" : "Arşive Taşı"}
-                className="rounded-full p-2 transition-colors hover:bg-white/20 text-white/90 hover:text-white cursor-pointer"
-              >
-                <HiOutlineArchiveBox className="size-5" />
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  if (confirm("Bu kişiyle olan tüm konuşma geçmişini (senin ekranından) silmek istediğine emin misin?")) {
-                    setThread([]);
-                    if (threadCache.current[active.id]) delete threadCache.current[active.id];
-                    startSend(async () => {
-                      const ok = await deleteConversation(active.id);
-                      if (ok.ok) {
-                        const r = await fetchContacts(q);
-                        setContacts(r.contacts);
+                  <DropdownMenuItem
+                    className="text-red-600 focus:text-red-600"
+                    onClick={() => {
+                      if (confirm("Bu kişiyle olan tüm konuşma geçmişini (senin ekranından) silmek istediğine emin misin?")) {
+                        setThread([]);
+                        if (threadCache.current[active.id]) delete threadCache.current[active.id];
+                        startSend(async () => {
+                          const ok = await deleteConversation(active.id);
+                          if (ok.ok) {
+                            const r = await apiFetchContacts(q);
+                            setContacts(r.contacts);
+                          }
+                        });
                       }
-                    });
-                  }
-                }}
-                title="Tüm Sohbeti Temizle"
-                className="rounded-full p-2 transition-colors hover:bg-white/20 text-white/90 hover:text-white cursor-pointer"
-              >
-                <HiOutlineTrash className="size-5" />
-              </button>
+                    }}
+                  >
+                    <HiOutlineTrash className="mr-2 size-4" />
+                    Tüm Sohbeti Temizle
+                  </DropdownMenuItem>
 
-              <button
-                type="button"
-                onClick={() => {
-                  const isBlocked = active.isBlocked;
-                  if (!isBlocked && !confirm("Bu kişiyi engellemek istediğinize emin misiniz? Size mesaj gönderemeyecek.")) return;
-                  
-                  startSend(async () => {
-                    const ok = isBlocked 
-                      ? await unblockUserAction(active.id)
-                      : await blockUserAction(active.id);
-                    
-                    if (ok.ok) {
-                      toast.success(isBlocked ? "Engel kaldırıldı." : "Kullanıcı engellendi.");
-                      const r = await fetchContacts(q);
-                      setContacts(r.contacts);
-                      setActive((prev) => prev ? { ...prev, isBlocked: !isBlocked } : null);
-                    }
-                  });
-                }}
-                title={active.isBlocked ? "Engeli Kaldır" : "Kişiyi Engelle"}
-                className={cn(
-                  "rounded-full p-2 transition-colors cursor-pointer",
-                  active.isBlocked ? "bg-red-500 text-white hover:bg-red-600 shadow-xs" : "hover:bg-white/20 text-white/90 hover:text-white"
-                )}
-              >
-                <HiOutlineNoSymbol className="size-5" />
-              </button>
+                  <DropdownMenuSeparator />
+
+                  <DropdownMenuItem
+                    className="text-red-600 focus:text-red-600"
+                    onClick={() => {
+                      const isBlocked = active.isBlocked;
+                      if (!isBlocked && !confirm("Bu kişiyi engellemek istediğinize emin misiniz? Size mesaj gönderemeyecek.")) return;
+                      startSend(async () => {
+                        const ok = isBlocked
+                          ? await unblockUserAction(active.id)
+                          : await blockUserAction(active.id);
+                        if (ok.ok) {
+                          toast.success(isBlocked ? "Engel kaldırıldı." : "Kullanıcı engellendi.");
+                          const r = await apiFetchContacts(q);
+                          setContacts(r.contacts);
+                          setActive((prev) => prev ? { ...prev, isBlocked: !isBlocked } : null);
+                        }
+                      });
+                    }}
+                  >
+                    <HiOutlineNoSymbol className="mr-2 size-4" />
+                    {active.isBlocked ? "Engeli Kaldır" : "Kişiyi Engelle"}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
 
               <button
                 type="button"
@@ -523,7 +591,7 @@ export function LiveChat() {
                     tab === "support" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
                   )}
                 >
-                  Destek (IT)
+                  Teknik Destek
                 </button>
                 <button
                   onClick={() => setTab("chat")}
@@ -537,11 +605,12 @@ export function LiveChat() {
                 <button
                   onClick={() => setTab("archived")}
                   className={cn(
-                    "flex-1 pb-2 text-sm font-semibold transition-colors border-b-2",
+                    "pb-2 px-3 text-sm font-semibold transition-colors border-b-2 flex items-center justify-center",
                     tab === "archived" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
                   )}
+                  title="Arşiv"
                 >
-                  Arşiv
+                  <HiOutlineArchiveBox className="size-5" />
                 </button>
               </div>
               <div className="p-3">
@@ -569,31 +638,36 @@ export function LiveChat() {
                   const itContacts = contacts.filter(c => !c.isArchived && itRoles.includes(c.role || "") && !c.isMe);
                   const otherContacts = contacts.filter(c => !c.isArchived && !itRoles.includes(c.role || "") && !c.isMe);
                   const archivedContacts = contacts.filter(c => c.isArchived && !c.isMe);
-                  
+
                   const visibleContacts = (tab === "support" ? itContacts : tab === "chat" ? otherContacts : archivedContacts).sort((a, b) => {
-                    // 1. Okunmamış olanlar en üstte
-                    if (a.unread > 0 && b.unread === 0) return -1;
-                    if (b.unread > 0 && a.unread === 0) return 1;
-                    
-                    // 2. Departmana göre sırala (sadece Sohbet sekmesi için)
-                    if (tab === "chat") {
-                      const depA = a.department || "ZZZ_NoDepartment";
-                      const depB = b.department || "ZZZ_NoDepartment";
-                      if (depA !== depB) {
-                        return depA.localeCompare(depB, "tr");
+                      // 1. Okunmamış olanlar en üstte
+                      if (a.unread > 0 && b.unread === 0) return -1;
+                      if (b.unread > 0 && a.unread === 0) return 1;
+
+                      // 2. Aktif (Online) olanlar üstte
+                      if (a.isOnline && !b.isOnline) return -1;
+                      if (b.isOnline && !a.isOnline) return 1;
+
+                      // 3. Kata ve Departmana göre sırala (sadece Sohbet sekmesi için)
+                      if (tab === "chat") {
+                        const floorCmp = compareFloors(a.floor, b.floor);
+                        if (floorCmp !== 0) return floorCmp;
+                        const depA = a.department || "ZZZ_NoDepartment";
+                        const depB = b.department || "ZZZ_NoDepartment";
+                        if (depA !== depB) {
+                          return depA.localeCompare(depB, "tr");
+                        }
+                      } else {
+                        // 4. En son mesajlaşılanlar (destek veya arşiv için)
+                        if (a.lastMessageAt && !b.lastMessageAt) return -1;
+                        if (!a.lastMessageAt && b.lastMessageAt) return 1;
+                        if (a.lastMessageAt && b.lastMessageAt) {
+                          return new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime();
+                        }
                       }
-                    } else {
-                      // 3. En son mesajlaşılanlar (destek veya arşiv için)
-                      if (a.lastMessageAt && !b.lastMessageAt) return -1;
-                      if (!a.lastMessageAt && b.lastMessageAt) return 1;
-                      if (a.lastMessageAt && b.lastMessageAt) {
-                        return new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime();
-                      }
-                    }
-                    
-                    // 4. Alfabetik sıralama
-                    return a.name.localeCompare(b.name, "tr");
-                  });
+
+                      return a.name.localeCompare(b.name, "tr");
+                    });
 
                   if (visibleContacts.length === 0) {
                      return (
@@ -610,18 +684,20 @@ export function LiveChat() {
                       {visibleContacts.map((c) => {
                         let showDepartmentHeader = false;
                         if (tab === "chat") {
-                          const dep = c.department || "Diğer Departmanlar";
+                          const dep = c.department
+                            ? `${c.department}${c.floor ? ` (${c.floor})` : ""}`
+                            : "Diğer Departmanlar";
                           if (dep !== currentDepartment) {
                             showDepartmentHeader = true;
                             currentDepartment = dep;
                           }
                         }
-                        
+
                         return (
                           <div key={c.id}>
                             {showDepartmentHeader && (
                               <div className="bg-muted/30 px-4 py-1.5 sticky top-0 z-10 backdrop-blur-md border-y border-border/50">
-                                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{currentDepartment}</span>
+                                <span className="text-[11px] font-bold text-muted-foreground tracking-wide">{currentDepartment}</span>
                               </div>
                             )}
                             <button
@@ -639,7 +715,7 @@ export function LiveChat() {
                               }}
                               className={cn(
                             "flex w-full items-center gap-4 border-b px-4 py-3 text-left last:border-b-0 transition-colors group relative",
-                            c.isMe ? "opacity-70 cursor-default bg-muted/20" : 
+                            c.isMe ? "opacity-70 cursor-default bg-muted/20" :
                             c.unread > 0 ? "bg-primary/5 hover:bg-primary/10" : "hover:bg-muted/50"
                           )}
                         >
@@ -663,19 +739,30 @@ export function LiveChat() {
                                 </span>
                               )}
                             </div>
-                            <p className="truncate text-[11px] font-medium text-primary/80 mb-0.5">
-                              {c.department ? `${c.sub} • ${c.department}` : c.sub}
-                            </p>
+                            <div className="flex items-center gap-1.5 truncate text-[11px] font-medium text-primary/80 mb-0.5">
+                              <span className="truncate">{c.department ? `${c.sub} • ${c.department}${c.floor ? ` (${c.floor})` : ""}` : c.sub}</span>
+                              {c.computerName && (
+                                <span className="shrink-0 font-mono text-[9px] bg-muted px-1.5 py-0.2 rounded border text-muted-foreground">
+                                  🖥️ {c.computerName}
+                                </span>
+                              )}
+                            </div>
                             {c.lastMessage && (
                               <p className="truncate text-xs text-muted-foreground">
                                 <span className={c.unread > 0 ? "font-bold text-foreground" : ""}>{c.lastMessage}</span>
                               </p>
                             )}
                             {c.isBlocked && (
-                              <p className="text-[10px] font-semibold text-red-500 mt-1 uppercase">Engellendi</p>
+                              <div className="flex items-center gap-1 mt-1 text-muted-foreground/80">
+                                <HiOutlineNoSymbol className="size-3" />
+                                <span className="text-[10px] font-medium">Engellendi</span>
+                              </div>
                             )}
                             {c.directMessagesEnabled === false && (
-                              <p className="text-[10px] font-semibold text-amber-500 mt-1 uppercase">Mesaj Alımı Kapalı</p>
+                              <div className="flex items-center gap-1 mt-1 text-muted-foreground/80">
+                                <HiOutlineNoSymbol className="size-3" />
+                                <span className="text-[10px] font-medium">Mesaj alımı kapalı</span>
+                              </div>
                             )}
                           </div>
                           {c.unread > 0 ? (
@@ -700,19 +787,8 @@ export function LiveChat() {
               className="flex-1 space-y-3 overflow-y-auto bg-[url('/bg-chat.png')] bg-muted/10 p-4"
             >
               {loadingThread ? (
-                <div className="space-y-4 p-2 animate-pulse">
-                  <div className="flex justify-start">
-                    <div className="h-10 w-44 rounded-2xl rounded-tl-sm bg-muted-foreground/15" />
-                  </div>
-                  <div className="flex justify-end">
-                    <div className="h-12 w-56 rounded-2xl rounded-tr-sm bg-primary/20" />
-                  </div>
-                  <div className="flex justify-start">
-                    <div className="h-9 w-36 rounded-2xl rounded-tl-sm bg-muted-foreground/15" />
-                  </div>
-                  <div className="flex justify-end">
-                    <div className="h-14 w-48 rounded-2xl rounded-tr-sm bg-primary/20" />
-                  </div>
+                <div className="flex h-full w-full items-center justify-center p-8">
+                  <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent opacity-60" />
                 </div>
               ) : thread.length === 0 ? (
                 <div className="mt-10 flex flex-col items-center gap-3 px-6 text-center animate-in fade-in zoom-in duration-300">
@@ -720,7 +796,7 @@ export function LiveChat() {
                   <div>
                     <p className="font-bold text-lg">{active?.name}</p>
                     <p className="text-sm text-muted-foreground mt-1">
-                      {active?.department ? `${active?.sub} • ${active?.department}` : active?.sub}
+                      {active?.department ? `${active?.sub} • ${active?.department}${active?.floor ? ` (${active?.floor})` : ""}` : active?.sub}
                     </p>
                   </div>
                   {active?.isOnline ? (
@@ -735,12 +811,12 @@ export function LiveChat() {
                   <div
                     key={m.id}
                     className={cn(
-                      "flex animate-in fade-in slide-in-from-bottom-2 duration-300 group",
+                      "flex group",
                       m.fromMe ? "justify-end" : "justify-start",
                     )}
                   >
                     {m.fromMe && !m.id.startsWith("tmp-") && (
-                       <button 
+                       <button
                          onClick={() => handleDelete(m.id)}
                          className="mr-2 self-center opacity-0 group-hover:opacity-100 text-destructive/70 hover:text-destructive transition-all hover:scale-110"
                          title="Mesajı Sil"
@@ -799,7 +875,7 @@ export function LiveChat() {
                       )}
 
                       <div className={cn(
-                         "flex items-center gap-1 mt-1 text-[10px]", 
+                         "flex items-center gap-1 mt-1 text-[10px]",
                          m.fromMe ? "justify-end text-white/70" : "justify-start text-muted-foreground"
                       )}>
                          <span>{new Date(m.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
@@ -860,14 +936,25 @@ export function LiveChat() {
             )}
 
             {active?.isBlocked ? (
-              <div className="border-t bg-muted p-4 text-center">
-                <p className="text-sm font-semibold text-red-500">Bu kullanıcıyı engellediniz.</p>
-                <p className="text-xs text-muted-foreground mt-1">Mesaj göndermek için engeli kaldırın.</p>
+              <div className="flex items-center justify-center border-t bg-muted/20 px-4 py-6 text-center text-muted-foreground">
+                <div className="flex flex-col items-center gap-2">
+                  <HiOutlineNoSymbol className="size-5" />
+                  <p className="text-sm font-medium">Bu kullanıcıyı engellediniz.</p>
+                </div>
               </div>
-            ) : active?.directMessagesEnabled === false ? (
-              <div className="border-t bg-muted p-4 text-center">
-                <p className="text-sm font-semibold text-amber-500">Mesaj Alımı Kapalı</p>
-                <p className="text-xs text-muted-foreground mt-1">Bu kullanıcı mesaj alımını kapatmış.</p>
+            ) : (active?.directMessagesEnabled === false && !isIT) ? (
+              <div className="flex items-center justify-center border-t bg-muted/20 px-4 py-6 text-center text-muted-foreground">
+                <div className="flex flex-col items-center gap-2">
+                  <HiOutlineNoSymbol className="size-5" />
+                  <p className="text-sm font-medium">Bu sohbet mesaj alımına kapalı.</p>
+                </div>
+              </div>
+            ) : (tab !== "support" && active && !active.isOnline) ? (
+              <div className="flex items-center justify-center border-t bg-muted/20 px-4 py-6 text-center text-muted-foreground">
+                <div className="flex flex-col items-center gap-2">
+                  <HiOutlineNoSymbol className="size-5" />
+                  <p className="text-sm font-medium">Bu kişi şu anda çevrimdışı. Çevrimiçi olduğunda mesaj gönderebilirsiniz.</p>
+                </div>
               </div>
             ) : (
               <form
@@ -881,7 +968,7 @@ export function LiveChat() {
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.zip,.rar"
+                  accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.json,.zip,.rar,.7z,.mp3,.wav,.mp4,.mov,.avi"
                   className="hidden"
                   onChange={handleFileChange}
                 />

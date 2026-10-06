@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { notifyMany } from "@/lib/notify";
 import { nextTicketNumber } from "@/lib/tickets";
+import { rateLimit, requestIp } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -25,14 +26,17 @@ function extractEmail(from: unknown): string | null {
 }
 
 export async function POST(req: Request) {
+  const limited = rateLimit(`inbound-email:${requestIp(req)}`, 60, 60_000);
+  if (!limited.allowed) return NextResponse.json({ error: "too many requests" }, { status: 429, headers: { "Retry-After": String(limited.retryAfter) } });
   const secret = process.env.INBOUND_EMAIL_SECRET;
-  if (secret) {
-    const url = new URL(req.url);
-    const provided =
-      req.headers.get("x-webhook-secret") ?? url.searchParams.get("secret");
-    if (provided !== secret) {
-      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-    }
+  if (!secret) {
+    console.error("INBOUND_EMAIL_SECRET tanımlı değil; webhook güvenlik nedeniyle kapalı.");
+    return NextResponse.json({ error: "service unavailable" }, { status: 503 });
+  }
+  const url = new URL(req.url);
+  const provided = req.headers.get("x-webhook-secret") ?? url.searchParams.get("secret");
+  if (provided !== secret) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
   let payload: Record<string, unknown>;

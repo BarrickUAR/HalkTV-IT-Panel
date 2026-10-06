@@ -50,7 +50,7 @@ export function OnboardingForm({ departments }: { departments: any[] }) {
           <option value="">— Departman seçin (opsiyonel) —</option>
           {departments.map((d) => (
             <option key={d.id} value={d.id}>
-              {d.name}
+              {d.name}{d.floor ? ` (${d.floor})` : ""}
             </option>
           ))}
         </select>

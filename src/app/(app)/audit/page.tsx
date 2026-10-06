@@ -19,6 +19,7 @@ import { prisma } from "@/lib/prisma";
 import { cn } from "@/lib/utils";
 import { STATUS_LABELS } from "@/lib/ticket-labels";
 import { ROLE_LABELS } from "@/lib/rbac/roles";
+import { UserAvatar } from "@/components/app-shell/user-avatar";
 
 export const metadata = { title: "İşlem Kayıtları (Loglar)" };
 
@@ -86,7 +87,58 @@ const ACTION_CONFIG: Record<
     tone: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
     icon: HiOutlineCheckCircle,
   },
+  LOGIN: {
+    label: "Oturum Açıldı",
+    tone: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
+    icon: HiOutlineShieldCheck,
+  },
+  LOGOUT: {
+    label: "Oturum Kapatıldı",
+    tone: "bg-zinc-500/10 text-zinc-600 dark:text-zinc-400 border-zinc-500/20",
+    icon: HiOutlineShieldCheck,
+  },
+  KIOSK_CONNECTED: {
+    label: "Kiosk Bağlandı",
+    tone: "bg-teal-500/10 text-teal-600 dark:text-teal-400 border-teal-500/20",
+    icon: HiOutlineComputerDesktop,
+  },
+  KIOSK_DISCONNECTED: {
+    label: "Kiosk Bağlantısı Kesildi",
+    tone: "bg-zinc-500/10 text-zinc-600 dark:text-zinc-400 border-zinc-500/20",
+    icon: HiOutlineComputerDesktop,
+  },
+  FILE_UPLOADED: {
+    label: "Dosya Yüklendi",
+    tone: "bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/20",
+    icon: HiOutlineDocumentText,
+  },
+  DEPARTMENT_CREATED: {
+    label: "Departman Oluşturuldu",
+    tone: "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20",
+    icon: HiOutlineCheckCircle,
+  },
+  DEPARTMENT_UPDATED: {
+    label: "Departman Güncellendi",
+    tone: "bg-violet-500/10 text-violet-600 dark:text-violet-400 border-violet-500/20",
+    icon: HiOutlineCheckCircle,
+  },
+  COMPUTER_ASSIGNED: {
+    label: "Cihaz Zimmetlendi",
+    tone: "bg-teal-500/10 text-teal-600 dark:text-teal-400 border-teal-500/20",
+    icon: HiOutlineComputerDesktop,
+  },
+  COMPUTER_MESSAGE_SENT: {
+    label: "Cihaz Mesajı Gönderildi",
+    tone: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20",
+    icon: HiOutlineComputerDesktop,
+  },
+  ANNOUNCEMENT_CREATED: {
+    label: "Duyuru Yayınlandı",
+    tone: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20",
+    icon: HiOutlineMegaphone,
+  },
 };
+
 
 function formatAuditDetail(log: any) {
   const meta = (log.metadata || {}) as Record<string, any>;
@@ -123,6 +175,26 @@ function formatAuditDetail(log: any) {
     }
     case "FEEDBACK_READ":
       return `${actorName}, gelen bir anonim şikayet/öneriyi okundu olarak işaretledi.`;
+    case "LOGIN":
+      return `${actorName} sisteme giriş yaptı. (${meta.method || "credentials"})`;
+    case "LOGOUT":
+      return `${actorName} sistemden çıkış yaptı.`;
+    case "KIOSK_CONNECTED":
+      return `${actorName}, Kiosk bağlantısı kurdu. Bilgisayar: ${meta.hostname || "Bilinmiyor"}`;
+    case "KIOSK_DISCONNECTED":
+      return `${actorName} Kiosk bağlantısı kesildi.`;
+    case "FILE_UPLOADED":
+      return `${actorName}, "${meta.fileName || "dosya"}" yükledi. (${meta.subfolder || ""})`;
+    case "DEPARTMENT_CREATED":
+      return `${actorName}, "${meta.name || "departman"}" departmanını oluşturdu.`;
+    case "DEPARTMENT_UPDATED":
+      return `${actorName}, "${meta.name || "departman"}" departmanını güncelledi.`;
+    case "COMPUTER_ASSIGNED":
+      return `${actorName}, "${meta.computerName || "cihaz"}" cihazını "${meta.userName || "kullanıcı"}" adlı personele zimmetledi.`;
+    case "COMPUTER_MESSAGE_SENT":
+      return `${actorName}, "${meta.computerName || "cihaz"}" cihazına mesaj gönderdi.`;
+    case "ANNOUNCEMENT_CREATED":
+      return `${actorName}, "${meta.title || "duyuru"}" başlıklı duyuruyu yayınladı.`;
     default:
       return `${actorName}, ${log.entityType} üzerinde işlem gerçekleştirdi.`;
   }
@@ -149,6 +221,7 @@ export default async function AuditLogPage({
   else if (type === "user") whereClause.entityType = "User";
   else if (type === "computer") whereClause.entityType = "Computer";
   else if (type === "feedback") whereClause.entityType = "Feedback";
+  else if (type === "login") whereClause.action = { in: ["LOGIN", "LOGOUT", "KIOSK_CONNECTED", "KIOSK_DISCONNECTED"] };
 
   const [logs, totalCount, todayCount] = await Promise.all([
     prisma.auditLog.findMany({
@@ -202,6 +275,7 @@ export default async function AuditLogPage({
           { key: "user", label: "Kullanıcılar" },
           { key: "computer", label: "Cihaz & Envanter" },
           { key: "feedback", label: "Şikayet & Öneriler" },
+          { key: "login", label: "Oturum / Kiosk" },
         ].map((tab) => {
           const active = (type === undefined && tab.key === undefined) || type === tab.key;
           return (
@@ -265,9 +339,7 @@ export default async function AuditLogPage({
                       {/* İşlemi Yapan */}
                       <td className="px-5 py-3.5 whitespace-nowrap">
                         <div className="flex items-center gap-2.5">
-                          <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-xs uppercase">
-                            {log.actor?.name?.charAt(0) || log.actor?.email?.charAt(0) || "S"}
-                          </div>
+                          <UserAvatar role={log.actor?.role as any || "USER"} image={log.actor?.image} name={log.actor?.name} className="size-8 text-[10px]" />
                           <div>
                             <p className="font-semibold text-xs leading-none text-foreground">
                               {log.actor?.name || log.actor?.email || "Sistem / Otomasyon"}

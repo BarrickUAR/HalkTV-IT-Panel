@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 40" fill="none">
+  <rect width="140" height="40" rx="8" fill="#c8102e"/>
+  <!-- Broadcast Play / Satellite Wave Emblem -->
+  <circle cx="22" cy="20" r="13" fill="#ffffff" fill-opacity="0.15"/>
+  <path d="M16 13L28 20L16 27V13Z" fill="#ffffff"/>
+  <path d="M26 12C28.5 14 30 17 30 20C30 23 28.5 26 26 28" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" fill="none"/>
+  <!-- MARSIS Brand Text -->
+  <text x="38" y="25" fill="#ffffff" font-family="'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-weight="900" font-size="15" letter-spacing="2">MARSIS</text>
+  <text x="105" y="18" fill="#ffffff" font-family="'Segoe UI', Roboto, sans-serif" font-weight="700" font-size="7" opacity="0.85">TV</text>
+</svg>

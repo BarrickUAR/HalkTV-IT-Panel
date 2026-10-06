@@ -50,6 +50,12 @@ export function PushPrompt() {
   }, []);
 
   async function enablePush() {
+    if (typeof navigator !== 'undefined' && navigator.userAgent.includes("Electron")) {
+      toast.info("Masaüstü uygulamasında bildirimler otomatik olarak çalışmaktadır.");
+      setShowPrompt(false);
+      return;
+    }
+
     if (!("serviceWorker" in navigator)) {
       toast.error("Tarayıcınız anlık bildirimleri desteklemiyor.");
       return;
@@ -112,4 +118,3 @@ export function PushPrompt() {
     </Button>
   );
 }
-

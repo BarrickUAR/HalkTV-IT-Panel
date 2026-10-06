@@ -102,8 +102,8 @@ export async function addComment(input: {
     recipients.filter((id) => id !== ctx.user.id),
     {
       type: "TICKET_COMMENT",
-      title: `${ctx.user.name ?? ctx.user.email ?? "Biri"} mesaj gönderdi`,
-      body: parsed.data.body.slice(0, 80),
+      title: ctx.it ? `Talebiniz yanıtlandı · #${t.number}` : `${ctx.user.name ?? ctx.user.email ?? "Biri"} mesaj gönderdi`,
+      body: ctx.it ? `Teknik ekip talebinize yanıt verdi: ${parsed.data.body.slice(0, 70)}` : parsed.data.body.slice(0, 80),
       link: `/tickets/${t.id}`,
       entityType: "Ticket",
       entityId: t.id,

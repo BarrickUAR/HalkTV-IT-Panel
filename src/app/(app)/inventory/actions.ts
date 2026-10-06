@@ -98,24 +98,32 @@ export async function saveComputerAction(_prev: any, formData: FormData) {
   return { ok: true };
 }
 
-export async function deleteComputerAction(id: string) {
+export async function deleteComputerAction(id: string): Promise<{ok?: boolean; error?: string}> {
   const actor = await requireRole(["TEKNIK_MUDUR", "SUPER_ADMIN"]);
 
-  const comp = await prisma.computer.findUnique({ where: { id } });
-  if (comp) {
-    await prisma.computer.delete({
-      where: { id },
-    });
+  try {
+    const comp = await prisma.computer.findUnique({ where: { id } });
+    if (comp) {
+      await prisma.computer.delete({
+        where: { id },
+      });
 
-    await createAuditLog({
-      actorId: actor.id,
-      action: "COMPUTER_DELETED",
-      entityType: "Computer",
-      entityId: id,
-      metadata: {
-        name: comp.name,
-      },
-    });
+      await createAuditLog({
+        actorId: actor.id,
+        action: "COMPUTER_DELETED",
+        entityType: "Computer",
+        entityId: id,
+        metadata: {
+          computerId: id,
+          computerName: comp.name,
+        },
+      });
+    }
+  } catch (e: any) {
+    if (e.code === "P2003") {
+      return { error: "Bu cihaza bağlı başka kayıtlar olduğu için silinemiyor." };
+    }
+    return { error: "Silinirken bir hata oluştu." };
   }
 
   revalidatePath("/inventory");

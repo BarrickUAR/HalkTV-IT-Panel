@@ -3,7 +3,7 @@
 import { useActionState, useEffect } from "react";
 import { useFormStatus } from "react-dom";
 import { toast } from "sonner";
-import { HiOutlineEnvelope, HiOutlinePhone, HiOutlineBuildingOffice2, HiOutlineComputerDesktop, HiOutlineUser } from "react-icons/hi2";
+import { HiOutlineEnvelope, HiOutlinePhone, HiOutlineBuildingOffice2, HiOutlineComputerDesktop, HiOutlineUser, HiOutlineBriefcase } from "react-icons/hi2";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -53,26 +53,26 @@ export function ProfileForm({
   return (
     <div className="overflow-hidden rounded-2xl border bg-card">
       <div className="h-32 bg-muted" />
-      
+
       <div className="px-6 pb-8">
         <div className="-mt-12 mb-6 flex items-end gap-4">
           <div className="relative group">
-            <UserAvatar 
-              role={user.role} 
-              image={user.image} 
-              className="size-24 border-4 border-card text-4xl shadow-sm transition-opacity group-hover:opacity-70" 
+            <UserAvatar
+              role={user.role}
+              image={user.image}
+              className="size-24 border-4 border-card text-4xl shadow-sm transition-opacity group-hover:opacity-70"
             />
-            <label 
-              htmlFor="pf-image-upload" 
+            <label
+              htmlFor="pf-image-upload"
               className="absolute inset-0 flex cursor-pointer items-center justify-center rounded-full bg-black/50 opacity-0 transition-opacity group-hover:opacity-100"
             >
               <span className="text-xs font-semibold text-white">Değiştir</span>
             </label>
-            <input 
-              type="file" 
-              id="pf-image-upload" 
-              accept="image/*" 
-              className="hidden" 
+            <input
+              type="file"
+              id="pf-image-upload"
+              accept="image/*"
+              className="hidden"
               onChange={(e) => {
                 const file = e.target.files?.[0];
                 if (!file) return;
@@ -90,7 +90,7 @@ export function ProfileForm({
                     // Trigger a re-render to show preview (we can cheat by submitting or just state)
                     hiddenInput.dispatchEvent(new Event('change', { bubbles: true }));
                   }
-                  
+
                   // Görseli anında önizleme için (DOM manipülasyonu)
                   const img = document.querySelector('.group img') as HTMLImageElement;
                   if (img) img.src = base64;
@@ -101,7 +101,9 @@ export function ProfileForm({
           </div>
           <div className="mb-2">
             <h2 className="text-2xl font-bold tracking-tight">{user.name}</h2>
-            <p className="font-medium text-primary">{roleLabel(user.role)}</p>
+            <p className="font-medium text-primary">
+              {roleLabel(user.role)}{user.title ? ` • ${user.title}` : ""}
+            </p>
           </div>
         </div>
 
@@ -121,6 +123,20 @@ export function ProfileForm({
                 readOnly={!!user.name && !isStaff}
               />
               {!!user.name && !isStaff && <p className="text-[10px] text-muted-foreground">İsim değiştirilemez. Değişiklik için IT ile görüşün.</p>}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="pf-title" className="flex items-center gap-1.5">
+                <HiOutlineBriefcase className="size-4 text-muted-foreground" /> Ünvan / Görev
+              </Label>
+              <Input
+                id="pf-title"
+                name="title"
+                defaultValue={user.title ?? ""}
+                placeholder="ör. Teknik Yönetmen, Haber Müdürü, Spiker, Kurgucu..."
+                className="h-10 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+              />
+              <p className="text-[10px] text-muted-foreground">Kurum içi göreviniz veya ünvanınız.</p>
             </div>
 
             <div className="space-y-2">
@@ -158,7 +174,7 @@ export function ProfileForm({
                     value={d.id}
                     className="bg-background text-foreground dark:bg-zinc-900 dark:text-zinc-100 py-1"
                   >
-                    {d.name}
+                    {d.name}{d.floor ? ` (${d.floor})` : ""}
                   </option>
                 ))}
               </select>

@@ -2,23 +2,18 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import {
   HiOutlineChartBarSquare,
   HiOutlineBookOpen,
   HiOutlineCube,
-  HiOutlineCalendar,
   HiOutlineClock,
-  HiOutlineKey,
   HiOutlineComputerDesktop,
   HiOutlineSquares2X2,
   HiOutlineViewColumns,
-  HiOutlineMapPin,
   HiOutlineSpeakerWave,
-  HiOutlineArchiveBox,
-  HiOutlineCog8Tooth,
   HiOutlineTicket,
   HiOutlineUsers,
-  HiOutlineWrenchScrewdriver,
   HiOutlineMegaphone,
 } from "react-icons/hi2";
 import type { IconType } from "react-icons";
@@ -27,9 +22,6 @@ import type { Role } from "@prisma/client";
 
 import { cn, playNotificationSound } from "@/lib/utils";
 import { can, isITStaff } from "@/lib/rbac/permissions";
-
-import { useEffect, useState } from "react";
-import { fetchSidebarBadgeCounts } from "./sidebar-actions";
 
 type NavItem = {
   href: string;
@@ -41,11 +33,14 @@ type NavItem = {
 
 type NavGroup = { title?: string; items: NavItem[] };
 
-export function Sidebar({ role }: { role: Role }) {
+interface SidebarProps {
+  role: Role;
+}
+
+export function Sidebar({ role }: SidebarProps) {
   const pathname = usePathname();
   const [counts, setCounts] = useState({ tickets: 0, feedbacks: 0 });
   const it = isITStaff(role);
-  const isManager = role === "TEKNIK_MUDUR" || role === "SUPER_ADMIN";
 
   useEffect(() => {
     let live = true;
@@ -53,22 +48,25 @@ export function Sidebar({ role }: { role: Role }) {
     let prevFeedbacks = 0;
     const load = async () => {
       try {
-        const res = await fetchSidebarBadgeCounts();
-        if (live) {
-          if (res.tickets > prevTickets || res.feedbacks > prevFeedbacks) {
+        const res = await fetch("/api/poll");
+        if (res.ok && live) {
+          const data = await res.json();
+          const t = data.sidebar.openTickets;
+          const f = data.sidebar.unreadFeedbacks;
+          if (t > prevTickets || f > prevFeedbacks) {
             playNotificationSound();
           }
-          prevTickets = res.tickets;
-          prevFeedbacks = res.feedbacks;
-          setCounts(res);
+          prevTickets = t;
+          prevFeedbacks = f;
+          setCounts({ tickets: t, feedbacks: f });
         }
       } catch {}
     };
     load();
-    const t = setInterval(load, 30000);
+    const timer = setInterval(load, 30000);
     return () => {
       live = false;
-      clearInterval(t);
+      clearInterval(timer);
     };
   }, []);
 
@@ -88,8 +86,18 @@ export function Sidebar({ role }: { role: Role }) {
           show: true,
           badge: counts.tickets,
         },
-        { href: "/board", label: "Pano", icon: HiOutlineViewColumns, show: it },
-        { href: "/knowledge", label: "Bilgi Bankası", icon: HiOutlineBookOpen, show: true },
+        {
+          href: "/board",
+          label: "Pano",
+          icon: HiOutlineViewColumns,
+          show: it,
+        },
+        {
+          href: "/knowledge",
+          label: "Bilgi Bankası",
+          icon: HiOutlineBookOpen,
+          show: true,
+        },
       ],
     },
     {
@@ -109,13 +117,19 @@ export function Sidebar({ role }: { role: Role }) {
         },
         {
           href: "/inventory",
-          label: "Envanter (Cihazlar)",
+          label: "Cihazlar",
           icon: HiOutlineComputerDesktop,
           show: can(role, "asset:manage"),
         },
         {
+          href: "/assets",
+          label: "Demirbaş ve Zimmet",
+          icon: HiOutlineCube,
+          show: can(role, "asset:manage"),
+        },
+        {
           href: "/audit",
-          label: "İşlem Kayıtları (Loglar)",
+          label: "İşlem Kayıtları",
           icon: HiOutlineClock,
           show: it,
         },
@@ -142,48 +156,60 @@ export function Sidebar({ role }: { role: Role }) {
           show: true,
           badge: it ? counts.feedbacks : undefined,
         },
-        { href: "/profile", label: "Profilim", icon: HiOutlineCog8Tooth, show: true },
       ],
     },
   ];
 
   return (
-    <nav className="flex flex-col gap-4 p-3">
+    <nav className="flex flex-col gap-1 py-2 px-2 flex-1 overflow-y-auto">
       {groups.map((group, gi) => {
         const items = group.items.filter((i) => i.show);
         if (items.length === 0) return null;
         return (
-          <div key={gi} className="flex flex-col gap-1">
-            {group.title ? (
-              <p className="px-3 pb-1 text-[11px] font-semibold tracking-wider text-muted-foreground/70 uppercase">
-                {group.title}
-              </p>
-            ) : null}
+          <div key={gi} className="flex flex-col gap-0.5">
+            {group.title && (
+              <div className="flex items-center gap-2 px-2 pt-4 pb-1.5">
+                <span className="text-[10px] font-semibold tracking-widest text-muted-foreground/50 uppercase whitespace-nowrap">
+                  {group.title}
+                </span>
+                <div className="flex-1 h-px bg-border/60" />
+              </div>
+            )}
+
             {items.map((item) => {
               const active =
                 pathname === item.href ||
-                pathname.startsWith(`${item.href}/`);
+                (item.href !== "/dashboard" &&
+                  pathname.startsWith(`${item.href}/`));
+
               return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={cn(
-                    "flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-                    active
-                      ? "bg-primary/10 text-primary"
-                      : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                  )}
-                >
-                  <div className="flex items-center gap-3">
-                    <item.icon className="size-5" />
-                    {item.label}
-                  </div>
-                  {item.badge && item.badge > 0 ? (
-                    <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-bold text-primary-foreground">
-                      {item.badge > 99 ? "99+" : item.badge}
-                    </span>
-                  ) : null}
-                </Link>
+                <div key={item.href} className="relative">
+                  <Link
+                    href={item.href}
+                    className={cn(
+                      "relative flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition-colors select-none",
+                      active
+                        ? "bg-primary/10 text-primary font-semibold"
+                        : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
+                    )}
+                  >
+                    {/* Active left bar */}
+                    {active && (
+                      <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-0.5 rounded-r-full bg-primary" />
+                    )}
+
+                    <div className="flex items-center gap-3 min-w-0">
+                      <item.icon className="size-[18px] shrink-0" />
+                      <span className="truncate leading-none">{item.label}</span>
+                    </div>
+
+                    {item.badge && item.badge > 0 ? (
+                      <span className="ml-2 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-bold text-primary-foreground">
+                        {item.badge > 99 ? "99+" : item.badge}
+                      </span>
+                    ) : null}
+                  </Link>
+                </div>
               );
             })}
           </div>

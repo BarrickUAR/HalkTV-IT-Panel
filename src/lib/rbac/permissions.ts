@@ -71,8 +71,8 @@ const TEKNIK_YONETMEN: Permission[] = [
 
 // IT Müdürü
 const TEKNIK_MUDUR: Permission[] = [
-  ...TEKNIK_YONETMEN, 
-  "ticket:delete", 
+  ...TEKNIK_YONETMEN,
+  "ticket:delete",
   "user:manage",
   "role:manage",
   "settings:manage",
@@ -87,8 +87,21 @@ const SUPER_ADMIN: Permission[] = [
   "integration:manage",
 ];
 
+const MANAGER: Permission[] = [
+  ...EMPLOYEE,
+  "approval:decide", // Yöneticiler onay verebilir
+  "report:view", // Departman raporlarını görebilir
+];
+
+const GENEL_YAYIN_YONETMENI: Permission[] = [
+  ...MANAGER,
+  "announcement:manage", // Duyuru yapabilir
+];
+
 export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   EMPLOYEE,
+  MANAGER,
+  GENEL_YAYIN_YONETMENI,
   IT_AGENT,
   TEKNIK_YONETMEN,
   TEKNIK_MUDUR,

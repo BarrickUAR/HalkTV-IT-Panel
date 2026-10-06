@@ -15,8 +15,8 @@ export default async function OnboardingPage() {
   if (user.name) redirect("/dashboard");
 
   const departments = await prisma.department.findMany({
-    orderBy: { name: "asc" },
-    select: { id: true, name: true },
+    orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+    select: { id: true, name: true, floor: true },
   });
 
   return (

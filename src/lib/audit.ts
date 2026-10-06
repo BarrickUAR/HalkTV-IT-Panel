@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { auditContext } from "@/lib/audit-context";
 
 export type AuditAction =
   | "TICKET_CREATED"
@@ -39,14 +40,15 @@ export async function createAuditLog({
   ip?: string | null;
 }) {
   try {
+    const context = await auditContext(actorId, metadata, ip);
     return await prisma.auditLog.create({
       data: {
         actorId: actorId || null,
         action,
         entityType,
         entityId,
-        metadata: metadata ? (metadata as any) : undefined,
-        ip: ip || null,
+        metadata: JSON.parse(JSON.stringify(context.metadata)),
+        ip: context.ip,
       },
     });
   } catch (error) {
@@ -54,4 +56,3 @@ export async function createAuditLog({
     return null;
   }
 }
-

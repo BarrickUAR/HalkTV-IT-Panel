@@ -39,11 +39,12 @@ export default async function FeedbackInboxPage() {
           {feedbackList.map((f) => {
             const isComplaint = f.type === "COMPLAINT";
             return (
-              <div
+              <Link
+                href={`/feedback/inbox/${f.id}`}
                 key={f.id}
                 className={cn(
-                  "relative flex flex-col gap-4 rounded-xl border bg-card p-5 transition-colors",
-                  f.isRead ? "opacity-70 grayscale-[20%]" : "border-primary/30 shadow-sm"
+                  "relative flex flex-col gap-4 rounded-xl border bg-card p-5 transition-all hover:shadow-md",
+                  f.isRead ? "opacity-90" : "border-primary/40 shadow-sm"
                 )}
               >
                 {!f.isRead && (
@@ -58,31 +59,41 @@ export default async function FeedbackInboxPage() {
                   )}>
                     {isComplaint ? <HiOutlineMegaphone className="size-5" /> : <HiOutlineLightBulb className="size-5" />}
                   </div>
-                  <div>
-                    <span className={cn(
-                      "text-xs font-bold uppercase tracking-wider",
-                      isComplaint ? "text-orange-600" : "text-emerald-600"
-                    )}>
-                      {isComplaint ? "Şikayet" : "Öneri"}
-                    </span>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className={cn(
+                        "text-xs font-bold uppercase tracking-wider",
+                        isComplaint ? "text-orange-600" : "text-emerald-600"
+                      )}>
+                        {isComplaint ? "Şikayet" : "Öneri"}
+                      </span>
+                      {f.category && (
+                        <span className="text-[10px] font-semibold bg-muted px-2 py-0.5 rounded-full text-muted-foreground">
+                          {f.category}
+                        </span>
+                      )}
+                      <span className={cn(
+                        "text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ml-auto mr-4",
+                        f.status === "NEW" ? "bg-blue-500/10 text-blue-600" :
+                        f.status === "IN_PROGRESS" ? "bg-amber-500/10 text-amber-600" :
+                        f.status === "RESOLVED" ? "bg-emerald-500/10 text-emerald-600" :
+                        "bg-red-500/10 text-red-600"
+                      )}>
+                        {f.status === "NEW" ? "YENİ" : f.status === "IN_PROGRESS" ? "İNCELENİYOR" : f.status === "RESOLVED" ? "ÇÖZÜLDÜ" : "REDDEDİLDİ"}
+                      </span>
+                    </div>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      {format(new Date(f.createdAt), "d MMMM yyyy HH:mm", { locale: tr })}
+                      {format(new Date(f.createdAt), "d MMMM yyyy HH:mm", { locale: tr })} • KOD: {f.pinCode}
                     </p>
                   </div>
                 </div>
 
-                <div className="rounded-lg bg-muted/40 p-4">
-                  <p className="text-sm whitespace-pre-wrap leading-relaxed">
+                <div className="rounded-lg bg-muted/40 p-3">
+                  <p className="text-sm whitespace-pre-wrap leading-relaxed line-clamp-2 text-foreground/80">
                     {f.content}
                   </p>
                 </div>
-
-                {!f.isRead && (
-                  <div className="flex justify-end mt-1">
-                    <MarkReadButton id={f.id} />
-                  </div>
-                )}
-              </div>
+              </Link>
             );
           })}
         </div>

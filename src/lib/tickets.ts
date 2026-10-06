@@ -9,6 +9,5 @@ export async function nextTicketNumber(): Promise<string> {
     SELECT nextval('ticket_number_seq') AS nextval
   `;
   const seq = Number(rows[0]?.nextval ?? 1);
-  const year = new Date().getFullYear();
-  return `HTV-${year}-${String(seq).padStart(6, "0")}`;
+  return `HTV-${String(seq).padStart(4, "0")}`;
 }

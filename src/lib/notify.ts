@@ -3,6 +3,7 @@ import type { NotificationType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { dispatchWebhooks } from "@/lib/integrations";
 import { sendPushNotification } from "@/lib/push";
+import { publishChatEvent } from "@/lib/chat-events";
 
 type NotifyInput = {
   type: NotificationType;
@@ -26,6 +27,7 @@ export async function notify(userId: string, input: NotifyInput) {
       entityId: input.entityId,
     },
   });
+  publishChatEvent(userId, { kind: "notification" });
   await dispatchWebhooks(input);
 
   // Tarayıcı Web Push bildirimi gönder
@@ -51,6 +53,7 @@ export async function notifyMany(userIds: string[], input: NotifyInput) {
       entityId: input.entityId,
     })),
   });
+  for (const id of ids) publishChatEvent(id, { kind: "notification" });
   await dispatchWebhooks(input);
 
   // Tüm hedeflere Web Push gönder

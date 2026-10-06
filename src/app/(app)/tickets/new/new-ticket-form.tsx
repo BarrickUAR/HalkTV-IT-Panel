@@ -1,7 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
-import { useFormStatus } from "react-dom";
+import { useActionState, useState, useTransition } from "react";
 import {
   HiOutlineComputerDesktop,
   HiOutlineCommandLine,
@@ -16,6 +15,7 @@ import {
   HiOutlinePaperClip,
   HiOutlineMapPin,
   HiOutlineTrash,
+  HiOutlineDocumentText,
 } from "react-icons/hi2";
 
 import { Button } from "@/components/ui/button";
@@ -41,40 +41,90 @@ const PRIORITIES = [
   { id: "URGENT", icon: HiOutlineExclamationTriangle, color: "text-red-500", bg: "bg-red-500/10", border: "border-red-200 dark:border-red-900" },
 ] as const;
 
-function SubmitButton() {
-  const { pending } = useFormStatus();
-  return (
-    <Button type="submit" className="h-12 w-full text-base font-semibold shadow-md" disabled={pending}>
-      {pending ? "Talep İletiliyor…" : "Talebi Gönder"}
-    </Button>
-  );
-}
-
 export function NewTicketForm({
   departments = [],
 }: {
-  departments?: { id: string; name: string }[];
+  departments?: { id: string; name: string; floor?: string | null }[];
 }) {
   const [state, action] = useActionState(createTicket, undefined);
   const [cat, setCat] = useState("HARDWARE");
   const [pri, setPri] = useState("MEDIUM");
-  const [file, setFile] = useState<File | null>(null);
+
+  const [files, setFiles] = useState<File[]>([]);
+  const [isDragActive, setIsDragActive] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
+  const [isPending, startTransition] = useTransition();
 
   const deptList =
     departments.length > 0
       ? departments
       : [
-          { id: "haber", name: "Haber Merkezi" },
-          { id: "reji", name: "Reji & Yayın" },
-          { id: "kurgu", name: "Kurgu & Montaj" },
-          { id: "teknik", name: "Teknik Servis & IT" },
-          { id: "muhasebe", name: "Muhasebe & Finans" },
-          { id: "ik", name: "İnsan Kaynakları" },
-          { id: "yonetim", name: "Yönetim" },
+          { id: "haber", name: "Haber Merkezi", floor: null },
+          { id: "reji", name: "Reji & Yayın", floor: null },
+          { id: "kurgu", name: "Kurgu & Montaj", floor: null },
+          { id: "teknik", name: "Teknik Servis & IT", floor: null },
+          { id: "muhasebe", name: "Muhasebe & Finans", floor: null },
+          { id: "ik", name: "İnsan Kaynakları", floor: null },
+          { id: "yonetim", name: "Yönetim", floor: null },
         ];
 
+  const handleDrag = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setIsDragActive(true);
+    } else if (e.type === "dragleave") {
+      setIsDragActive(false);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragActive(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      setFiles((prev) => [...prev, ...Array.from(e.dataTransfer.files!)]);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const formData = new FormData(form);
+
+    startTransition(async () => {
+      setIsUploading(true);
+      setUploadError("");
+      try {
+        if (files.length > 10) throw new Error("En fazla 10 dosya ekleyebilirsiniz.");
+        const claims: Array<{ url: string; claimToken: string; fileName: string; mimeType: string; sizeBytes: number }> = [];
+        for (const file of files) {
+          if (file.size > 50 * 1024 * 1024) throw new Error(`${file.name}: 50 MB sınırı aşıldı.`);
+          const fd = new FormData();
+          fd.append("file", file);
+          fd.append("subfolder", "tickets");
+          const res = await fetch("/api/upload", { method: "POST", body: fd });
+          const data = await res.json();
+          if (!res.ok || !data.url || !data.claimToken) throw new Error(data.error || `${file.name} yüklenemedi.`);
+          claims.push({ url: data.url, claimToken: data.claimToken, fileName: data.fileName, mimeType: data.mimeType, sizeBytes: data.sizeBytes });
+        }
+        if (claims.length > 0) formData.set("attachmentClaims", JSON.stringify(claims));
+
+        // Form verisini sunucu aksiyonuna ilet
+        action(formData);
+      } catch (error) {
+        setUploadError(error instanceof Error ? error.message : "Dosya yüklenemedi.");
+      } finally {
+        setIsUploading(false);
+      }
+    });
+  };
+
+  const isBusy = isPending || isUploading;
+
   return (
-    <form action={action} className="space-y-8">
+    <form onSubmit={handleSubmit} className="space-y-8">
       {/* BAŞLIK */}
       <div className="space-y-3">
         <Label htmlFor="title" className="text-base font-semibold">
@@ -161,24 +211,23 @@ export function NewTicketForm({
         </div>
       </div>
 
-      {/* AÇIKLAMA */}
-      <div className="space-y-3">
-        <Label htmlFor="description" className="text-base font-semibold">
-          Detaylı Açıklama
-        </Label>
-        <textarea
-          id="description"
-          name="description"
-          required
-          rows={4}
-          placeholder="Lütfen yaşadığınız sorunu detaylıca anlatın. Ekranda bir hata mesajı görüyorsanız mutlaka belirtin."
-          className="w-full rounded-xl border border-input bg-muted/30 p-4 text-sm outline-none transition-colors focus-visible:bg-transparent focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 resize-none"
-        />
-      </div>
-
-      {/* LOKASYON & DOSYA */}
-      <div className="grid gap-6 sm:grid-cols-2">
+      {/* AÇIKLAMA & LOKASYON */}
+      <div className="space-y-6">
         <div className="space-y-3">
+          <Label htmlFor="description" className="text-base font-semibold">
+            Detaylı Açıklama
+          </Label>
+          <textarea
+            id="description"
+            name="description"
+            required
+            rows={4}
+            placeholder="Lütfen yaşadığınız sorunu detaylıca anlatın. Ekranda bir hata mesajı görüyorsanız mutlaka belirtin."
+            className="w-full rounded-xl border border-input bg-muted/30 p-4 text-sm outline-none transition-colors focus-visible:bg-transparent focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 resize-none"
+          />
+        </div>
+
+        <div className="space-y-3 max-w-sm">
           <Label htmlFor="location" className="text-base font-semibold">Bulunduğunuz Yer</Label>
           <div className="relative">
             <HiOutlineMapPin className="absolute left-3 top-1/2 -translate-y-1/2 size-5 text-muted-foreground" />
@@ -191,65 +240,81 @@ export function NewTicketForm({
               <option value="">Lütfen departman seçin...</option>
               {deptList.map((d) => (
                 <option key={d.id} value={d.id}>
-                  {d.name}
+                  {d.name}{d.floor ? ` (${d.floor})` : ""}
                 </option>
               ))}
               <option value="other">Diğer / Şube Dışı</option>
             </select>
           </div>
         </div>
+      </div>
 
-        <div className="space-y-3">
-          <Label htmlFor="attachment" className="text-base font-semibold">Ekran Görüntüsü / Dosya (Opsiyonel)</Label>
-          <div className="relative">
-            <input
-              id="attachment"
-              name="attachment"
-              type="file"
-              className="sr-only"
-              onChange={(e) => setFile(e.target.files?.[0] || null)}
-            />
-            <label
-              htmlFor="attachment"
-              className={cn(
-                "flex h-11 cursor-pointer items-center justify-between rounded-xl border border-dashed px-4 text-sm transition-colors",
-                file ? "border-primary bg-primary/5" : "border-border hover:bg-muted/30"
-              )}
-            >
-              <div className="flex items-center gap-2 overflow-hidden">
-                <HiOutlinePaperClip className={cn("size-4 shrink-0", file ? "text-primary" : "text-muted-foreground")} />
-                <span className={cn("truncate font-medium", file ? "text-primary" : "text-muted-foreground")}>
-                  {file ? file.name : "Dosya yüklemek için tıklayın..."}
-                </span>
-              </div>
-              {file && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    setFile(null);
-                    const el = document.getElementById("attachment") as HTMLInputElement;
-                    if (el) el.value = "";
-                  }}
-                  className="rounded-full p-1 hover:bg-black/10 text-destructive"
-                >
-                  <HiOutlineTrash className="size-4" />
-                </button>
-              )}
-            </label>
+      {/* DOSYA YÜKLEME (Sürükle-Bırak) */}
+      <div className="space-y-3">
+        <Label className="text-base font-semibold">Ekran Görüntüsü / Dosya (Opsiyonel)</Label>
+
+        <div
+          onDragEnter={handleDrag}
+          onDragLeave={handleDrag}
+          onDragOver={handleDrag}
+          onDrop={handleDrop}
+          className={cn(
+            "relative flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-8 text-center transition-colors",
+            isDragActive ? "border-primary bg-primary/5" : "border-muted-foreground/20 hover:bg-muted/30 hover:border-muted-foreground/40",
+            files.length > 0 ? "pb-4" : ""
+          )}
+        >
+          <input
+            type="file"
+            multiple
+            className="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0"
+            onChange={(e) => {
+              if (e.target.files?.length) {
+                setFiles((prev) => [...prev, ...Array.from(e.target.files!)]);
+              }
+            }}
+          />
+          <div className="mb-4 flex size-12 items-center justify-center rounded-full bg-muted">
+            <HiOutlinePaperClip className="size-6 text-muted-foreground" />
           </div>
+          <h4 className="mb-1 text-sm font-semibold">Dosyaları buraya sürükleyin veya tıklayın</h4>
+          <p className="text-xs text-muted-foreground">Birden fazla dosya ekleyebilirsiniz (Resim, PDF vs.)</p>
+
+          {/* Yüklenen Dosyalar */}
+          {files.length > 0 && (
+            <div className="mt-6 flex w-full flex-wrap gap-2 relative z-20">
+              {files.map((file, i) => (
+                <div key={i} className="flex items-center gap-2 rounded-lg border bg-background px-3 py-2 text-xs shadow-sm">
+                  <HiOutlineDocumentText className="size-4 text-primary" />
+                  <span className="max-w-[150px] truncate font-medium">{file.name}</span>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setFiles((prev) => prev.filter((_, index) => index !== i));
+                    }}
+                    className="ml-1 rounded-full p-1 hover:bg-destructive/10 text-destructive transition-colors"
+                  >
+                    <HiOutlineTrash className="size-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
-      {state?.error && (
+      {(state?.error || uploadError) && (
         <div className="rounded-xl border border-destructive/20 bg-destructive/10 p-4 text-sm font-semibold text-destructive flex items-center gap-2">
           <HiOutlineExclamationTriangle className="size-5 shrink-0" />
-          {state.error}
+          {state?.error || uploadError}
         </div>
       )}
 
       <div className="pt-2">
-        <SubmitButton />
+        <Button type="submit" className="h-12 w-full text-base font-semibold shadow-md" disabled={isBusy}>
+          {isBusy ? "Talep İletiliyor…" : "Talebi Gönder"}
+        </Button>
       </div>
     </form>
   );

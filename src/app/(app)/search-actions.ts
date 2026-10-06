@@ -7,9 +7,10 @@ import { prisma } from "@/lib/prisma";
 export type SearchResults = {
   tickets: { id: string; number: string; title: string }[];
   users: { id: string; name: string; sub: string }[];
+  computers: { id: string; name: string; sub: string }[];
 };
 
-const EMPTY: SearchResults = { tickets: [], users: [] };
+const EMPTY: SearchResults = { tickets: [], users: [], computers: [] };
 
 export async function globalSearch(query: string): Promise<SearchResults> {
   const q = query.trim().toLowerCase();
@@ -20,7 +21,7 @@ export async function globalSearch(query: string): Promise<SearchResults> {
   const isManager = user.role === "TEKNIK_MUDUR" || user.role === "SUPER_ADMIN";
 
   try {
-    const [tickets, users] = await Promise.all([
+    const [tickets, users, computers] = await Promise.all([
       prisma.ticket.findMany({
         where: {
           AND: [
@@ -37,15 +38,25 @@ export async function globalSearch(query: string): Promise<SearchResults> {
         orderBy: { createdAt: "desc" },
         take: 6,
       }),
-      isManager
-        ? prisma.user.findMany({
+      prisma.user.findMany({
+        where: {
+          OR: [
+            { name: { contains: q, mode: "insensitive" } },
+            { email: { contains: q, mode: "insensitive" } },
+          ],
+        },
+        select: { id: true, name: true, email: true, title: true },
+        take: 5,
+      }),
+      it
+        ? prisma.computer.findMany({
             where: {
               OR: [
                 { name: { contains: q, mode: "insensitive" } },
-                { email: { contains: q, mode: "insensitive" } },
+                { notes: { contains: q, mode: "insensitive" } },
               ],
             },
-            select: { id: true, name: true, email: true, title: true },
+            select: { id: true, name: true, notes: true },
             take: 5,
           })
         : Promise.resolve([]),
@@ -57,6 +68,11 @@ export async function globalSearch(query: string): Promise<SearchResults> {
         id: u.id,
         name: u.name ?? u.email ?? "?",
         sub: u.title ?? u.email ?? "",
+      })),
+      computers: computers.map((c) => ({
+        id: c.id,
+        name: c.name,
+        sub: c.notes?.slice(0, 50) ?? "",
       })),
     };
   } catch {

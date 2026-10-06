@@ -1,4 +1,5 @@
 "use server";
+import { publishChatEvent } from "@/lib/chat-events";
 
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth-helpers";
@@ -6,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { notify } from "@/lib/notify";
 import { ROLE_LABELS } from "@/lib/rbac/roles";
 import { isITStaff } from "@/lib/rbac/permissions";
+import { verifyUploadClaim } from "@/lib/upload-claim";
 
 export type MessageDTO = {
   id: string;
@@ -24,6 +26,7 @@ export type Contact = {
   name: string;
   sub: string;
   department: string | null;
+  floor?: string | null;
   unread: number;
   role?: string;
   image?: string | null;
@@ -34,19 +37,27 @@ export type Contact = {
   isArchived?: boolean;
   isBlocked?: boolean;
   directMessagesEnabled?: boolean;
+  computerName?: string | null;
 };
 
 export async function fetchContacts(
   query?: string,
-): Promise<{ contacts: Contact[]; totalUnread: number; myDmEnabled: boolean }> {
+): Promise<{ contacts: Contact[]; totalUnread: number; myDmEnabled: boolean; isIT: boolean }> {
   const me = await requireUser();
   const q = (query ?? "").trim().toLowerCase();
 
   try {
-    const [users, unread, blocks, meUser] = await Promise.all([
+    const meUser = await prisma.user.findUnique({ where: { id: me.id }, select: { role: true, directMessagesEnabled: true } });
+    const isIT = ["IT_AGENT", "TEKNIK_MUDUR", "TEKNIK_YONETMEN", "SUPER_ADMIN"].includes(meUser?.role || "");
+
+    const [users, unread, blocks] = await Promise.all([
       prisma.user.findMany({
         where: {
           status: "ACTIVE",
+          ...(!isIT ? {
+            role: { in: ["IT_AGENT", "TEKNIK_MUDUR", "TEKNIK_YONETMEN", "SUPER_ADMIN"] },
+            showInLiveChat: true
+          } : {}),
           ...(q
             ? {
                 OR: [
@@ -56,16 +67,18 @@ export async function fetchContacts(
               }
             : {}),
         },
-        select: { 
-          id: true, 
-          name: true, 
-          email: true, 
-          title: true, 
-          role: true, 
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          title: true,
+          role: true,
           image: true,
           lastActiveAt: true,
           directMessagesEnabled: true,
-          department: { select: { name: true } },
+          showInLiveChat: true,
+          department: { select: { name: true, floor: true } },
+          computers: { select: { name: true }, take: 1 },
           dmSent: {
             where: { recipientId: me.id, deletedByRecipient: false },
             orderBy: { createdAt: 'desc' },
@@ -91,10 +104,6 @@ export async function fetchContacts(
         where: { blockerId: me.id },
         select: { blockedId: true }
       }),
-      prisma.user.findUnique({
-        where: { id: me.id },
-        select: { directMessagesEnabled: true },
-      }),
     ]);
 
     const unreadMap = new Map(unread.map((u) => [u.senderId, u._count]));
@@ -102,18 +111,26 @@ export async function fetchContacts(
     const blockedSet = new Set(blocks.map(b => b.blockedId));
     const myDmEnabled = meUser?.directMessagesEnabled ?? true;
 
+    const meIt = isITStaff(me.role);
     const now = new Date();
-    
+
     const contacts: Contact[] = users
+      .filter((u) => {
+        // If current user is NOT IT staff, and the contact is IT staff, hide if showInLiveChat is false
+        if (!meIt && isITStaff(u.role) && u.showInLiveChat === false) {
+          return false;
+        }
+        return true;
+      })
       .map((u) => {
         const isOnline = u.lastActiveAt ? (now.getTime() - u.lastActiveAt.getTime()) < 120000 : false;
-        
+
         let lastMsg = null;
         let lastMsgAt = null;
         let isArchived = false;
         const sent = u.dmSent[0];
         const rec = u.dmReceived[0];
-        
+
         if (sent && rec) {
           if (sent.createdAt > rec.createdAt) {
              lastMsg = sent.body;
@@ -139,6 +156,7 @@ export async function fetchContacts(
           name: u.name ?? u.email ?? "?",
           sub: u.title ?? ROLE_LABELS[u.role],
           department: u.department?.name ?? null,
+          floor: u.department?.floor ?? null,
           unread: unreadMap.get(u.id) ?? 0,
           role: u.role,
           image: u.image,
@@ -149,6 +167,7 @@ export async function fetchContacts(
           isArchived,
           isBlocked: blockedSet.has(u.id),
           directMessagesEnabled: u.directMessagesEnabled,
+          computerName: u.computers?.[0]?.name ?? null,
         };
       })
       .filter((c) => !c.isMe);
@@ -165,17 +184,17 @@ export async function fetchContacts(
       return a.name.localeCompare(b.name, "tr");
     });
 
-    return { contacts, totalUnread, myDmEnabled };
+    return { contacts, totalUnread, myDmEnabled, isIT: meIt };
   } catch (err) {
     console.error("fetchContacts error:", err);
-    return { contacts: [], totalUnread: 0, myDmEnabled: true };
+    return { contacts: [], totalUnread: 0, myDmEnabled: true, isIT: false };
   }
 }
 
 export async function unreadMessageCount(): Promise<number> {
   try {
     const me = await requireUser();
-    
+
     // Kullanıcının online durumunu güncelle
     prisma.user.update({
       where: { id: me.id },
@@ -225,23 +244,36 @@ export async function sendMessage(
   attachmentUrl?: string,
   attachmentName?: string,
   attachmentType?: string,
+  channelMode: "it" | "staff" = "staff",
+  attachmentClaimToken?: string,
 ): Promise<{ ok: boolean; error?: string; message?: MessageDTO }> {
   try {
     const me = await requireUser();
     const text = body.trim();
     if (!text && !attachmentUrl) return { ok: false, error: "Mesaj boş olamaz." };
     if (text.length > 4000) return { ok: false, error: "Mesaj çok uzun." };
+    if (attachmentUrl && !verifyUploadClaim(attachmentClaimToken, me.id, attachmentUrl, "messages")) {
+      return { ok: false, error: "Mesaj eki doğrulanamadı." };
+    }
     if (recipientId === me.id)
       return { ok: false, error: "Kendine mesaj gönderemezsin." };
 
     const recipient = await prisma.user.findUnique({
       where: { id: recipientId },
-      select: { id: true, directMessagesEnabled: true },
+      select: { id: true, role: true, lastActiveAt: true, directMessagesEnabled: true },
     });
     if (!recipient) return { ok: false, error: "Kullanıcı bulunamadı." };
 
-    if (!recipient.directMessagesEnabled) {
+    if (!recipient.directMessagesEnabled && !isITStaff(me.role)) {
       return { ok: false, error: "Bu kullanıcı mesaj alımını kapatmış." };
+    }
+
+    const supportConversation = channelMode === "it" && isITStaff(recipient.role);
+    const recipientIsOnline = Boolean(
+      recipient.lastActiveAt && Date.now() - recipient.lastActiveAt.getTime() < 180_000,
+    );
+    if (!supportConversation && !isITStaff(me.role) && !recipientIsOnline) {
+      return { ok: false, error: "Bu kişi şu anda çevrimdışı. Çevrimiçi olduğunda mesaj gönderebilirsiniz." };
     }
 
     // Engelleme kontrolü (Karşı taraf beni engellemiş mi?)
@@ -253,7 +285,7 @@ export async function sendMessage(
         }
       }
     });
-    if (blockCheck) {
+    if (blockCheck && !isITStaff(me.role) && !supportConversation) {
       return { ok: false, error: "Bu kullanıcıya mesaj gönderemezsiniz (Engellendiniz)." };
     }
 
@@ -266,7 +298,7 @@ export async function sendMessage(
         }
       }
     });
-    if (myBlockCheck) {
+    if (myBlockCheck && !isITStaff(me.role) && !supportConversation) {
       return { ok: false, error: "Engellediğiniz bir kullanıcıya mesaj gönderemezsiniz. Önce engeli kaldırın." };
     }
 
@@ -280,7 +312,9 @@ export async function sendMessage(
         attachmentType: attachmentType ?? null,
       },
     });
-    
+
+    publishChatEvent(recipientId, { kind: "message", partnerId: me.id });
+    publishChatEvent(me.id, { kind: "message", partnerId: recipientId });
     await notify(recipientId, {
       type: "DIRECT_MESSAGE",
       title: `${me.name ?? me.email ?? "Biri"} mesaj gönderdi`,
@@ -291,20 +325,20 @@ export async function sendMessage(
     });
     revalidatePath(`/messages/${recipientId}`);
     revalidatePath("/messages");
-    
-    return { 
-      ok: true, 
-      message: { 
-        id: msg.id, 
-        body: msg.body, 
-        fromMe: true, 
+
+    return {
+      ok: true,
+      message: {
+        id: msg.id,
+        body: msg.body,
+        fromMe: true,
         createdAt: msg.createdAt.toISOString(),
         attachmentUrl: msg.attachmentUrl,
         attachmentName: msg.attachmentName,
         attachmentType: msg.attachmentType,
         isRead: msg.isRead,
         readAt: msg.readAt?.toISOString() ?? null,
-      } 
+      }
     };
   } catch {
     return { ok: false, error: "Gönderilemedi." };
@@ -314,10 +348,11 @@ export async function sendMessage(
 export async function markThreadRead(otherId: string): Promise<void> {
   try {
     const me = await requireUser();
-    await prisma.directMessage.updateMany({
+    const result = await prisma.directMessage.updateMany({
       where: { senderId: otherId, recipientId: me.id, isRead: false },
       data: { isRead: true, readAt: new Date() },
     });
+    if (result.count) publishChatEvent(otherId, { kind: "read", partnerId: me.id });
   } catch {
     // sessiz geç
   }
@@ -329,9 +364,9 @@ export async function deleteMessage(messageId: string): Promise<{ ok: boolean }>
     const isStaff = isITStaff(me.role);
     const msg = await prisma.directMessage.findUnique({ where: { id: messageId }});
     if (!msg) return { ok: false };
-    
+
     // Gönderen kişi VEYA IT ekibi silebilir
-    if (msg.senderId !== me.id && !isStaff) return { ok: false }; 
+    if (msg.senderId !== me.id && !isStaff) return { ok: false };
 
     await prisma.directMessage.delete({ where: { id: messageId } });
     revalidatePath(`/messages/${msg.recipientId}`);
@@ -432,4 +467,14 @@ export async function unblockUserAction(userId: string): Promise<{ ok: boolean }
   } catch {
     return { ok: false };
   }
+}
+
+export async function toggleLiveChatVisibilityAction(enabled: boolean) {
+  const user = await requireUser();
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { showInLiveChat: enabled }
+  });
+  revalidatePath("/profile");
+  return { ok: true };
 }

@@ -48,3 +48,19 @@ export async function markAllRead(): Promise<{ ok: boolean }> {
   });
   return { ok: true };
 }
+
+export async function deleteNotification(id: string): Promise<{ ok: boolean }> {
+  const user = await requireUser();
+  await prisma.notification.deleteMany({
+    where: { id, userId: user.id },
+  });
+  return { ok: true };
+}
+
+export async function deleteAllNotifications(): Promise<{ ok: boolean }> {
+  const user = await requireUser();
+  await prisma.notification.deleteMany({
+    where: { userId: user.id },
+  });
+  return { ok: true };
+}

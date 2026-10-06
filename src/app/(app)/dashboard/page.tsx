@@ -14,6 +14,8 @@ import {
   HiOutlineBookOpen,
   HiOutlineCog8Tooth,
   HiOutlineMegaphone,
+  HiOutlineComputerDesktop,
+  HiOutlineSpeakerWave,
 } from "react-icons/hi2";
 import type { IconType } from "react-icons";
 
@@ -25,9 +27,13 @@ import { cn } from "@/lib/utils";
 import type { TicketStatus } from "@prisma/client";
 import { STATUS_BADGE, STATUS_LABELS } from "@/lib/ticket-labels";
 
+import { Prisma } from "@prisma/client";
+import { UserAvatar } from "@/components/app-shell/user-avatar";
 import { prisma } from "@/lib/prisma";
 import { ChatTriggerButton } from "./chat-trigger-button";
 import { DashboardCharts } from "./charts";
+import { QuickReportButtons } from "./quick-report-buttons";
+import { ActiveComputersWidget } from "./active-computers-widget";
 
 export const metadata: Metadata = { title: "Panel" };
 
@@ -70,6 +76,7 @@ type RecentTicket = {
   requester?: {
     name: string | null;
     title: string | null;
+    image?: string | null;
     department: { name: string } | null;
   };
 };
@@ -81,9 +88,11 @@ export default async function DashboardPage() {
 
   let stats: Stat[];
   let recent: RecentTicket[];
+  let activeComputers: any[] = [];
 
   let categoryData: any[] = [];
   let trendData: any[] = [];
+  let employeeExtras: { itOnlineCount: number; latestAnnouncements: { id: string; title: string; body: string; level: string; createdAt: Date }[] } | null = null;
 
   const recentSelect = {
     id: true,
@@ -92,7 +101,7 @@ export default async function DashboardPage() {
     status: true,
     createdAt: true,
     requester: {
-      select: { name: true, email: true, title: true, department: { select: { name: true } } }
+      select: { name: true, email: true, title: true, image: true, department: { select: { name: true } } }
     },
   } as const;
 
@@ -100,7 +109,7 @@ export default async function DashboardPage() {
       const sevenDaysAgo = new Date();
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-      const [open, inProgress, unassigned, users, recentTickets, categoryCounts, trendRaw] = await Promise.all([
+      const [open, inProgress, unassigned, users, recentTickets, categoryCounts, trendRaw, computers] = await Promise.all([
         prisma.ticket.count({ where: { status: "OPEN" } }),
         prisma.ticket.count({ where: { status: "IN_PROGRESS" } }),
         prisma.ticket.count({
@@ -120,7 +129,16 @@ export default async function DashboardPage() {
           where: { createdAt: { gte: sevenDaysAgo } },
           select: { createdAt: true },
         }),
+        prisma.computer.findMany({
+          orderBy: { updatedAt: "desc" },
+          take: 5,
+          include: {
+            user: { select: { name: true, email: true } },
+            department: { select: { name: true } },
+          },
+        }),
       ]);
+      activeComputers = computers;
 
       const trendMap = new Map<string, number>();
       for (let i = 6; i >= 0; i--) {
@@ -167,7 +185,7 @@ export default async function DashboardPage() {
       recent = recentTickets;
       categoryData = categoryCounts;
     } else {
-      const [myOpen, myResolved, recentTickets] = await Promise.all([
+      const [myOpen, myResolved, recentTickets, itOnlineCount, latestAnnouncements] = await Promise.all([
         prisma.ticket.count({
           where: {
             requesterId: user.id,
@@ -182,6 +200,19 @@ export default async function DashboardPage() {
           orderBy: { createdAt: "desc" },
           take: 6,
           select: recentSelect,
+        }),
+        prisma.user.count({
+          where: {
+            role: { in: ["IT_AGENT", "TEKNIK_YONETMEN", "TEKNIK_MUDUR", "SUPER_ADMIN"] },
+            status: "ACTIVE",
+            lastActiveAt: { gte: new Date(Date.now() - 10 * 60 * 1000) },
+          },
+        }),
+        prisma.announcement.findMany({
+          where: { isActive: true },
+          orderBy: { createdAt: "desc" },
+          take: 3,
+          select: { id: true, title: true, body: true, level: true, createdAt: true },
         }),
       ]);
       stats = [
@@ -199,11 +230,12 @@ export default async function DashboardPage() {
         },
       ];
       recent = recentTickets;
+      employeeExtras = { itOnlineCount, latestAnnouncements };
     }
 
   if (it) {
     return (
-      <div className="mx-auto max-w-5xl space-y-8">
+      <div className="mx-auto max-w-7xl space-y-8">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold tracking-tight">
@@ -211,9 +243,6 @@ export default async function DashboardPage() {
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">Destek operasyonuna genel bakış.</p>
           </div>
-          <Link href="/tickets/new" className={cn(buttonVariants(), "h-10 gap-2 px-4")}>
-            <HiOutlinePlus className="size-4" /> Yeni Talep
-          </Link>
         </div>
 
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -233,11 +262,7 @@ export default async function DashboardPage() {
             <div className="divide-y">
               {recent.map((t) => (
                 <Link key={t.id} href={`/tickets/${t.id}`} className="flex items-center gap-4 px-5 py-4 hover:bg-muted/40 transition-colors">
-                  <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-                    <span className="text-sm font-bold uppercase">
-                      {t.requester?.name?.charAt(0) ?? "?"}
-                    </span>
-                  </div>
+                  <UserAvatar role="USER" image={t.requester?.image} name={t.requester?.name} className="size-10" />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold">{t.title}</p>
                     <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
@@ -268,6 +293,9 @@ export default async function DashboardPage() {
           )}
         </div>
 
+        {/* Aktif Cihazlar & Kiosklar (Canlı Ağ & Anlık Mesajlaşma) */}
+        <ActiveComputersWidget activeComputers={activeComputers} />
+
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
           {[
             { href: "/board", label: "Pano", desc: "Kanban görünümü", icon: HiOutlineViewColumns },
@@ -290,7 +318,7 @@ export default async function DashboardPage() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-8 pb-12">
+    <div className="mx-auto max-w-7xl space-y-8 pb-12">
       {/* Employee Header */}
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary/90 to-primary/60 p-8 text-white shadow-lg">
         <div className="relative z-10 max-w-2xl">
@@ -324,7 +352,47 @@ export default async function DashboardPage() {
               </div>
             ))}
           </div>
-          
+
+          {/* IT Ekibi Online Göstergesi */}
+          {employeeExtras && (
+            <div className="rounded-2xl border bg-card p-4 shadow-sm flex items-center gap-3">
+              <div className={cn("size-3 rounded-full animate-pulse", employeeExtras.itOnlineCount > 0 ? "bg-emerald-500" : "bg-zinc-400")} />
+              <div>
+                <p className="text-sm font-semibold">{employeeExtras.itOnlineCount > 0 ? "IT Ekibi Online" : "IT Ekibi Çevrimdışı"}</p>
+                <p className="text-xs text-muted-foreground">
+                  {employeeExtras.itOnlineCount > 0 ? `${employeeExtras.itOnlineCount} personel aktif` : "Mesaj bırakabilirsiniz"}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Son Duyurular */}
+          {employeeExtras && employeeExtras.latestAnnouncements.length > 0 && (
+            <div className="rounded-2xl border bg-card p-4 shadow-sm space-y-3">
+              <h3 className="text-sm font-bold flex items-center gap-2">
+                <HiOutlineSpeakerWave className="size-4 text-primary" /> Son Duyurular
+              </h3>
+              {employeeExtras.latestAnnouncements.map(a => (
+                <div key={a.id} className="text-sm">
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium truncate flex-1">{a.title}</p>
+                    <span className={cn(
+                      "shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-bold",
+                      a.level === "CRITICAL" ? "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400" :
+                      a.level === "WARNING" ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400" :
+                      "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400"
+                    )}>
+                      {a.level === "CRITICAL" ? "Kritik" : a.level === "WARNING" ? "Uyarı" : "Bilgi"}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground truncate">{a.body}</p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <QuickReportButtons />
+
           <div className="rounded-2xl border bg-card p-5 shadow-sm">
             <h2 className="text-sm font-bold flex items-center gap-2 mb-4">
               <HiOutlineViewColumns className="size-4 text-primary" /> Faydalı Linkler
@@ -375,7 +443,7 @@ export default async function DashboardPage() {
                 Tümünü Gör
               </Link>
             </div>
-            
+
             <div className="flex-1 p-2">
               {recent.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full min-h-[200px] text-muted-foreground space-y-3">

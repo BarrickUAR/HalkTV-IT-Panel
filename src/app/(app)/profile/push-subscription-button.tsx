@@ -46,6 +46,11 @@ export function PushSubscriptionButton() {
   }, []);
 
   async function handleSubscribe() {
+    if (typeof navigator !== 'undefined' && navigator.userAgent.includes("Electron")) {
+      toast.info("Masaüstü uygulamasında bildirimler zaten otomatik olarak (Native) çalışmaktadır.");
+      return;
+    }
+
     if (!('serviceWorker' in navigator)) {
       toast.error("Tarayıcınız bildirimleri desteklemiyor.");
       return;
@@ -53,7 +58,7 @@ export function PushSubscriptionButton() {
     setLoading(true);
     try {
       const registration = await navigator.serviceWorker.ready;
-      
+
       let subscription = await registration.pushManager.getSubscription();
       if (subscription) {
         // Unsubscribe
@@ -104,9 +109,9 @@ export function PushSubscriptionButton() {
           <p className="text-xs text-muted-foreground mt-1">Yeni bir talep geldiğinde veya güncellendiğinde masaüstü bildirimi alın.</p>
         </div>
       </div>
-      <Button 
-        variant={isSubscribed ? "outline" : "default"} 
-        onClick={handleSubscribe} 
+      <Button
+        variant={isSubscribed ? "outline" : "default"}
+        onClick={handleSubscribe}
         disabled={loading}
       >
         {loading ? "Bekleniyor..." : isSubscribed ? "Kapat" : "Aktif Et"}

@@ -8,11 +8,11 @@ import { NewTicketForm } from "./new-ticket-form";
 export const metadata: Metadata = { title: "Yeni Talep" };
 
 export default async function NewTicketPage() {
-  let departments: { id: string; name: string }[] = [];
+  let departments: { id: string; name: string; floor: string | null }[] = [];
   try {
     departments = await prisma.department.findMany({
-      select: { id: true, name: true },
-      orderBy: { name: "asc" },
+      select: { id: true, name: true, floor: true },
+      orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
     });
   } catch {
     departments = [];

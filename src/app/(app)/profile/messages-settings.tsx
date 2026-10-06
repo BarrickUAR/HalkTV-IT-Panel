@@ -4,13 +4,17 @@ import { useTransition } from "react";
 import { HiOutlineChatBubbleLeftRight, HiOutlineNoSymbol } from "react-icons/hi2";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { toggleDirectMessagesAction, unblockUserAction } from "@/app/(app)/messages/actions";
+import { toggleDirectMessagesAction, unblockUserAction, toggleLiveChatVisibilityAction } from "@/app/(app)/messages/actions";
 
-export function MessagesSettings({ 
-  initialEnabled, 
-  blockedUsers 
-}: { 
+export function MessagesSettings({
+  initialEnabled,
+  initialShowInLiveChat,
+  isIT,
+  blockedUsers
+}: {
   initialEnabled: boolean;
+  initialShowInLiveChat: boolean;
+  isIT: boolean;
   blockedUsers: { id: string; name: string }[];
 }) {
   const [pending, start] = useTransition();
@@ -28,7 +32,7 @@ export function MessagesSettings({
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button 
+          <Button
             variant={initialEnabled ? "outline" : "default"}
             disabled={pending}
             onClick={() => {
@@ -40,12 +44,46 @@ export function MessagesSettings({
                   toast.error("Bir hata oluştu.");
                 }
               });
-            }} 
+            }}
           >
             {initialEnabled ? 'Kapat' : 'Aktif Et'}
           </Button>
         </div>
       </div>
+
+      {isIT && (
+        <div className="flex items-center justify-between border-t pt-4 mt-2">
+          <div className="flex items-center gap-4">
+            <div className="rounded-full p-3 bg-amber-500/10 text-amber-600 dark:text-amber-500">
+              <HiOutlineChatBubbleLeftRight className="size-5" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-sm">Canlı Destek Listesinde Görünürlük</h3>
+              <p className="text-[11px] text-muted-foreground mt-1 max-w-[350px] leading-relaxed">
+                Bu ayar kapalıyken diğer departman çalışanları Canlı Destek (Live Chat) sekmesinde sizi göremezler ve mesaj atamazlar.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant={initialShowInLiveChat ? "outline" : "default"}
+              disabled={pending}
+              onClick={() => {
+                start(async () => {
+                  const res = await toggleLiveChatVisibilityAction(!initialShowInLiveChat);
+                  if (res.ok) {
+                    toast.success(!initialShowInLiveChat ? "Listede görünür oldunuz." : "Listeden gizlendiniz.");
+                  } else {
+                    toast.error("Bir hata oluştu.");
+                  }
+                });
+              }}
+            >
+              {initialShowInLiveChat ? 'Gizle' : 'Görünür Ol'}
+            </Button>
+          </div>
+        </div>
+      )}
 
       {blockedUsers.length > 0 && (
         <div className="border-t pt-4">
@@ -59,8 +97,8 @@ export function MessagesSettings({
                   <HiOutlineNoSymbol className="size-4 text-red-500" />
                   <span className="text-sm font-medium">{user.name}</span>
                 </div>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   size="sm"
                   className="h-7 text-xs"
                   onClick={() => {
